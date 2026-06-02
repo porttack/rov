@@ -124,15 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      // Start from the earliest event's month
-      const sortedDates = Object.keys(dayCls).sort();
-      if (!sortedDates.length) {
+      if (!Object.keys(dayCls).length) {
         document.getElementById('year-loading').textContent = 'No events found.';
         return;
       }
-      const firstDate  = new Date(sortedDates[0] + 'T00:00:00');
-      const startYear  = firstDate.getFullYear();
-      const startMonth = firstDate.getMonth(); // 0-based
+      // July–June school year: Jan–May → show prev July; Jun–Dec → show current July
+      const now        = new Date();
+      const startYear  = now.getMonth() <= 4 ? now.getFullYear() - 1 : now.getFullYear();
+      const startMonth = 6; // July (0-based)
 
       const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       const leftCol  = document.getElementById('col-left');
