@@ -114,7 +114,6 @@ permalink: /newsletter/
 <script src="{{ '/assets/js/rov-common.js' | relative_url }}"></script>
 <script>
 const DETAIL_COUNT = 5;   // upcoming events shown with full detail
-const WEEKS_AHEAD  = 8;   // skim list horizon
 
 const TYPE_BG = {
   'class': 'bg-class', 'service': 'bg-service',
@@ -284,8 +283,7 @@ function calendarGrid(allRows, today) {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 function renderNewsletter(allRows) {
-  const today  = new Date(); today.setHours(0,0,0,0);
-  const cutoff = new Date(today.getTime() + WEEKS_AHEAD * 7 * 86400000);
+  const today = new Date(); today.setHours(0,0,0,0);
 
   const detailRows = [], skimRows = [];
 
@@ -293,7 +291,7 @@ function renderNewsletter(allRows) {
     const d = parseRowDate(row);
     if (!d) return;
     const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    if (dateOnly >= today && dateOnly <= cutoff) {
+    if (dateOnly >= today) {
       if (!isCancelled(row)) detailRows.push(row);
       skimRows.push(row);
     }

@@ -269,6 +269,16 @@ function syncToCalendar() {
     const startDt = buildDt_(dateVal, startVal);
     if (!startDt) { skipped++; continue; }
 
+    // noschool events are website-only — remove any previously synced ones and skip
+    if (eventType.toLowerCase() === 'noschool') {
+      if (calId) {
+        try { const ev = cal.getEventById(calId); if (ev) { ev.deleteEvent(); deleted++; } } catch(e) {}
+        sheet.getRange(i + 1, C_CALID).setValue('');
+      }
+      skipped++;
+      continue;
+    }
+
     // Remove cancelled events from calendar
     if (cancelled) {
       if (calId) {
@@ -278,7 +288,7 @@ function syncToCalendar() {
       continue;
     }
 
-    const title    = eventType ? `[${eventType}] ${desc}` : desc;
+    const title    = desc || eventType;
     const details  = [summary, comments].filter(Boolean).join('\n\n');
     const opts     = { description: details };
     const endDt    = endVal ? buildDt_(dateVal, endVal) : null;

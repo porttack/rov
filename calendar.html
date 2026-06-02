@@ -84,14 +84,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const end       = endTs   ? `${iso}T${to24h(endTs)}`   : undefined;
         const color     = cancelled ? CANCELLED_COLOR : (TYPE_COLORS[eventType] || '#6b7280');
 
+        // Build abbreviated time prefix, e.g. "3p-5p"
+        const timeStr = startTs
+          ? (endTs ? `${abbrevTime(startTs)}-${abbrevTime(endTs)}` : abbrevTime(startTs))
+          : '';
+        const title = timeStr ? `${timeStr} ${desc}` : desc;
+
         events.push({
-          title: desc || eventType || 'Event',
+          title,
           start, end, color,
+          displayEventTime: false,  // time is already in title
           classNames: cancelled ? ['ev-cancelled'] : [],
           extendedProps: { eventType, cancelled, desc, startTs, endTs,
             summary:  fv(row, COL.summary),
-            comments: fv(row, COL.comments),
-            picture:  fv(row, COL.picture) },
+            comments: fv(row, COL.comments) },
         });
       });
 
@@ -106,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         eventDidMount(info) {
           const p     = info.event.extendedProps;
           const lines = [info.event.title];
-          if (p.eventType && p.eventType !== info.event.title.toLowerCase()) lines.push(p.eventType);
           if (p.summary)  lines.push(p.summary);
           if (p.comments) lines.push('Notes: ' + p.comments);
           if (p.cancelled) lines.push('CANCELLED');
@@ -115,17 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         eventClick(info) {
           info.jsEvent.preventDefault();
-          const p       = info.event.extendedProps;
-          const timeStr = p.startTs
-            ? (p.endTs ? abbrevTime(p.startTs) + ' – ' + abbrevTime(p.endTs) : abbrevTime(p.startTs))
-            : '';
-          const lines   = [info.event.title];
-          if (p.eventType && p.eventType !== info.event.title.toLowerCase())
-            lines.push('Type: ' + p.eventType);
-          if (timeStr)    lines.push('Time: ' + timeStr);
+          const p     = info.event.extendedProps;
+          const lines = [info.event.title];
           if (p.summary)  lines.push('\n' + p.summary);
           if (p.comments) lines.push('Notes: ' + p.comments);
-          if (p.cancelled) lines.push('\n[CANCELLED]');
+          if (p.cancelled) lines.push('\nCANCELLED');
           alert(lines.join('\n'));
         },
       });
