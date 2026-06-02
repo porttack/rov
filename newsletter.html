@@ -89,6 +89,7 @@ permalink: /newsletter/
   .bg-fieldtrip    { background: #e9d5ff; }
   .bg-mentors      { background: #fce7f3; }
   .bg-presentation { background: #ccfbf1; }
+  .bg-noschool     { background: #fee2e2; }
   .bg-other        { background: #f3f4f6; }
 
   .bulletin-footer {
@@ -119,12 +120,12 @@ const TYPE_BG = {
   'class': 'bg-class', 'service': 'bg-service',
   'competition': 'bg-competition', 'workday': 'bg-workday',
   'fieldtrip': 'bg-fieldtrip', 'mentors': 'bg-mentors',
-  'presentation': 'bg-presentation', 'other': 'bg-other',
+  'presentation': 'bg-presentation', 'noschool': 'bg-noschool', 'other': 'bg-other',
 };
 const TYPE_ABBREV = {
   'class': 'Class', 'service': 'Service', 'competition': 'Comp',
   'workday': 'Workday', 'fieldtrip': 'Trip', 'mentors': 'Mentors',
-  'presentation': 'Pres', 'other': 'Other',
+  'presentation': 'Pres', 'noschool': 'No School', 'other': 'Other',
 };
 
 // ── Masthead ──────────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ function calendarGrid(allRows, today) {
   <span><span class="leg-swatch bg-fieldtrip"></span>Field Trip</span>
   <span><span class="leg-swatch bg-mentors"></span>Mentors</span>
   <span><span class="leg-swatch bg-presentation"></span>Presentation</span>
+  <span><span class="leg-swatch bg-noschool"></span>No School</span>
   <span><span class="leg-swatch bg-other"></span>Other</span>
 </p>`;
 

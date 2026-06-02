@@ -2,7 +2,7 @@
 
 // Replace this with your sheet's "Publish to web" CSV URL.
 // In your spreadsheet: File → Share → Publish to web → CSV → copy URL.
-const CSV_URL = 'PASTE_YOUR_PUBLISHED_CSV_URL_HERE';
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT212z-hIqUM_QfOruiWt6kQqdmw_DJ2alT-tOYmyJIRIQGcfpr3zPPIBGkc9Zh3aCEzQtbG92a9ok_/pub?gid=0&single=true&output=csv';
 
 // Column indices (0-based), matching spreadsheet column order:
 // A: Event type | B: Cancelled | C: Date | D: Start Time | E: End Time

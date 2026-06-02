@@ -41,7 +41,7 @@ const HEADERS = [
   'Description', 'Summary', 'Picture URL', 'Comments', 'Location', 'Calendar Event ID'
 ];
 
-const EVENT_TYPES = ['class', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'other'];
+const EVENT_TYPES = ['class', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'noschool', 'other'];
 
 const TYPE_COLORS = {
   'class':        '#c7d7fb',  // light blue
@@ -51,6 +51,7 @@ const TYPE_COLORS = {
   'fieldtrip':    '#e9d5ff',  // light purple
   'mentors':      '#fce7f3',  // light pink
   'presentation': '#ccfbf1',  // light teal
+  'noschool':     '#fee2e2',  // light red
   'other':        '#f3f4f6',  // light gray
 };
 const CANCELLED_BG = '#e5e7eb';
@@ -281,7 +282,7 @@ function syncToCalendar() {
     const details  = [summary, comments].filter(Boolean).join('\n\n');
     const opts     = { description: details };
     const endDt    = endVal ? buildDt_(dateVal, endVal) : null;
-    const isAllDay = !startVal;
+    const isAllDay = !startVal || eventType.toLowerCase() === 'noschool';
     const fallbackEnd = new Date(startDt.getTime() + 3600000); // +1 h
 
     if (location) opts.location = location;
