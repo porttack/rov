@@ -52,7 +52,8 @@ permalink: /year/
   .month-cal td:empty { background: none; }
 
   /* Event type cell colors */
-  .month-cal td.ev-class        { background: #c7d7fb; }
+  .month-cal td.ev-class          { background: #c7d7fb; }
+  .month-cal td.ev-class-extended { background: #bae6fd; }
   .month-cal td.ev-service      { background: #fed7aa; }
   .month-cal td.ev-competition  { background: #bbf7d0; }
   .month-cal td.ev-workday      { background: #fef9c3; }
@@ -68,6 +69,7 @@ permalink: /year/
 <div id="year-wrap" style="display:none">
   <div class="year-legend">
     <span class="leg-item"><span class="leg-swatch" style="background:#c7d7fb"></span>Class</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#bae6fd"></span>Class (extended)</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#fed7aa"></span>Service</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#bbf7d0"></span>Competition</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#fef9c3"></span>Workday</span>
@@ -89,7 +91,7 @@ permalink: /year/
 const TYPE_PRIORITY = {
   'competition': 0, 'fieldtrip': 1, 'service': 2,
   'mentors': 3, 'presentation': 4, 'workday': 5,
-  'class': 6, 'other': 7, 'noschool': 8,
+  'class-extended': 6, 'class': 7, 'other': 8, 'noschool': 9,
 };
 
 document.addEventListener('DOMContentLoaded', () => {

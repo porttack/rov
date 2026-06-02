@@ -82,7 +82,8 @@ permalink: /newsletter/
   .cal-date  { font-weight: bold; display: block; margin-bottom: 1px; }
   .cal-event { font-size: 0.82em; display: block; line-height: 1.3; }
 
-  .bg-class        { background: #c7d7fb; }
+  .bg-class          { background: #c7d7fb; }
+  .bg-class-extended { background: #bae6fd; }
   .bg-service      { background: #fed7aa; }
   .bg-competition  { background: #bbf7d0; }
   .bg-workday      { background: #fef9c3; }
@@ -116,13 +117,13 @@ permalink: /newsletter/
 const DETAIL_COUNT = 5;   // upcoming events shown with full detail
 
 const TYPE_BG = {
-  'class': 'bg-class', 'service': 'bg-service',
+  'class': 'bg-class', 'class-extended': 'bg-class-extended', 'service': 'bg-service',
   'competition': 'bg-competition', 'workday': 'bg-workday',
   'fieldtrip': 'bg-fieldtrip', 'mentors': 'bg-mentors',
   'presentation': 'bg-presentation', 'noschool': 'bg-noschool', 'other': 'bg-other',
 };
 const TYPE_ABBREV = {
-  'class': 'Class', 'service': 'Service', 'competition': 'Comp',
+  'class': 'Class', 'class-extended': 'Class+', 'service': 'Service', 'competition': 'Comp',
   'workday': 'Workday', 'fieldtrip': 'Trip', 'mentors': 'Mentors',
   'presentation': 'Pres', 'noschool': 'No School', 'other': 'Other',
 };
@@ -233,6 +234,7 @@ function calendarGrid(allRows, today) {
 <h2>Calendar</h2>
 <p class="calendar-legend">
   <span><span class="leg-swatch bg-class"></span>Class</span>
+  <span><span class="leg-swatch bg-class-extended"></span>Class (extended)</span>
   <span><span class="leg-swatch bg-service"></span>Service</span>
   <span><span class="leg-swatch bg-competition"></span>Competition</span>
   <span><span class="leg-swatch bg-workday"></span>Workday</span>
