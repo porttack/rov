@@ -1,0 +1,25 @@
+title: ROV Club
+email: ebrown@slvusd.org
+description: >-
+  San Lorenzo Valley ROV Club – events, calendar, and newsletter.
+baseurl: ""
+url: "https://rov.porttack.com"
+
+theme: minima
+minima:
+  skin: classic
+
+header_pages:
+  - calendar.html
+  - newsletter.html
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+exclude:
+  - appscript/
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - CLAUDE.md

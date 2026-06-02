@@ -1,0 +1,318 @@
+---
+layout: page
+title: Newsletter
+permalink: /newsletter/
+---
+
+<style>
+  #bulletin {
+    max-width: 760px;
+    margin: 0 auto;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 11pt;
+    color: #222;
+    line-height: 1.55;
+  }
+
+  .masthead { text-align: center; margin-bottom: 1.5em; padding-bottom: 1em; border-bottom: 3px solid #17458F; }
+  .masthead h1 { font-size: 2.2em; color: #17458F; margin: 0 0 0.15em; letter-spacing: 0.02em; }
+  .masthead-sub { color: #666; font-style: italic; font-size: 0.95em; margin: 0; }
+
+  .bulletin-section { margin-top: 1.8em; }
+  .bulletin-section > h2 {
+    color: #17458F; font-size: 1.35em;
+    border-bottom: 2px solid #17458F;
+    padding-bottom: 0.2em; margin-bottom: 0.8em;
+  }
+
+  .event-block { margin-bottom: 1.2em; }
+  .event-heading { color: #1a56db; font-size: 1.05em; margin: 0.8em 0 0.15em; }
+  .event-meta { color: #555; font-style: italic; font-size: 0.9em; margin: 0 0 0.5em; }
+  .event-photo {
+    display: block; max-width: 320px; height: auto;
+    margin: 0.6em 0; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  }
+  .event-narrative { margin: 0.5em 0; }
+  .event-comments { font-size: 0.9em; color: #555; margin: 0.3em 0; }
+
+  .section-rule { border: none; border-top: 1px solid #e0e0e0; margin: 1.2em 0; }
+
+  .month-group h3 {
+    color: #17458F; font-size: 1em; margin: 1em 0 0.25em;
+    font-family: Arial, sans-serif; font-weight: bold;
+  }
+  .skim-list { list-style: none; padding: 0; margin: 0 0 0.5em; }
+  .skim-item {
+    font-size: 0.88em; padding: 0.22em 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-family: Arial, sans-serif;
+  }
+  .skim-item.cancelled { color: #bbb; }
+  .skim-type { color: #888; }
+
+  /* Calendar grid */
+  .calendar-legend {
+    color: #666; font-size: 0.82em; font-style: italic;
+    margin-bottom: 0.5em; font-family: Arial, sans-serif;
+    display: flex; flex-wrap: wrap; gap: 0.6em;
+  }
+  .leg-swatch {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 2px; vertical-align: middle; margin-right: 3px;
+  }
+  .month-calendar { margin: 0.8em 0; overflow-x: auto; }
+  .month-calendar > h3 {
+    color: #17458F; font-size: 0.95em; font-weight: bold;
+    margin: 1em 0 0.2em; font-family: Arial, sans-serif;
+  }
+  .cal-table {
+    border-collapse: collapse; width: 100%;
+    font-size: 0.78em; font-family: Arial, sans-serif;
+  }
+  .cal-table th {
+    background: #1a3a6b; color: #fff; font-weight: bold;
+    padding: 3px 5px; text-align: center; border: 1px solid #fff;
+  }
+  .cal-table td {
+    border: 1px solid #ddd; padding: 3px 4px;
+    vertical-align: top; min-width: 36px;
+  }
+  .cal-table td.empty { background: #f5f5f5; }
+  .cal-date  { font-weight: bold; display: block; margin-bottom: 1px; }
+  .cal-event { font-size: 0.82em; display: block; line-height: 1.3; }
+
+  .bg-class       { background: #c7d7fb; }
+  .bg-service     { background: #fed7aa; }
+  .bg-competition { background: #bbf7d0; }
+  .bg-workday     { background: #fef9c3; }
+  .bg-fieldtrip   { background: #e9d5ff; }
+  .bg-other       { background: #f3f4f6; }
+
+  .bulletin-footer {
+    margin-top: 2em; padding-top: 0.5em; border-top: 1px solid #ddd;
+    color: #bbb; font-size: 0.75em; text-align: center;
+    font-style: italic; font-family: Arial, sans-serif;
+  }
+
+  @media (max-width: 600px) {
+    #bulletin { font-size: 10pt; }
+    .event-photo { max-width: 100%; }
+    .cal-table { font-size: 0.68em; }
+    .cal-table td { min-width: 28px; padding: 2px; }
+  }
+</style>
+
+<div id="bulletin-loading" style="text-align:center;padding:2em;color:#666;">
+  Loading events&hellip;
+</div>
+<article id="bulletin" style="display:none;"></article>
+
+<script src="{{ '/assets/js/rov-common.js' | relative_url }}"></script>
+<script>
+const DETAIL_COUNT = 5;   // upcoming events shown with full detail
+const WEEKS_AHEAD  = 8;   // skim list horizon
+
+const TYPE_BG = {
+  'class': 'bg-class', 'service': 'bg-service',
+  'competition': 'bg-competition', 'workday': 'bg-workday',
+  'fieldtrip': 'bg-fieldtrip',
+};
+const TYPE_ABBREV = {
+  'class': 'Class', 'service': 'Service',
+  'competition': 'Comp', 'workday': 'Workday',
+  'fieldtrip': 'Trip',
+};
+
+// ── Masthead ──────────────────────────────────────────────────────────────
+function masthead(today) {
+  const ds = fmt(today, {month:'long', day:'numeric', year:'numeric'});
+  return `<header class="masthead">
+  <h1>ROV Club</h1>
+  <p class="masthead-sub">Events &amp; Newsletter &nbsp;&middot;&nbsp; ${esc(ds)}</p>
+</header>`;
+}
+
+// ── Coming Up ─────────────────────────────────────────────────────────────
+function comingUp(rows) {
+  const blocks = rows.map((row, idx) => {
+    const d         = parseRowDate(row);
+    const eventType = fv(row, COL.eventType) || 'Event';
+    const desc      = getDesc(row);
+    const summary   = fv(row, COL.summary);
+    const picture   = fv(row, COL.picture);
+    const comments  = fv(row, COL.comments);
+    const startTs   = fv(row, COL.startTime);
+    const endTs     = fv(row, COL.endTime);
+
+    const timeStr = startTs
+      ? (endTs ? `${abbrevTime(startTs)}–${abbrevTime(endTs)}` : abbrevTime(startTs))
+      : '';
+
+    let html = `<div class="event-block">
+  <h3 class="event-heading">${esc(fmtShort(d))}: ${esc(desc)}</h3>
+  <p class="event-meta">${esc(fmtLong(d))}${timeStr ? ' &nbsp;&middot;&nbsp; ' + esc(timeStr) : ''} &nbsp;&middot;&nbsp; <em>${esc(eventType)}</em></p>`;
+
+    if (picture && picture.startsWith('http')) {
+      html += `\n  <img src="${esc(picture)}" alt="${esc(desc)}" class="event-photo" loading="lazy" onerror="this.style.display='none'">`;
+    }
+    if (summary)  html += `\n  <p class="event-narrative">${textToHtml(summary)}</p>`;
+    if (comments) html += `\n  <p class="event-comments"><strong>Notes:</strong> ${textToHtml(comments)}</p>`;
+
+    html += `\n</div>`;
+    if (idx < rows.length - 1) html += `\n<hr class="section-rule">`;
+    return html;
+  }).join('\n');
+
+  return `<section class="bulletin-section">
+<h2>Coming Up</h2>
+${blocks}
+</section>`;
+}
+
+// ── Looking Ahead ─────────────────────────────────────────────────────────
+function lookingAhead(rows) {
+  let inner = '', curMonth = '', openList = false;
+
+  rows.forEach(row => {
+    const d         = parseRowDate(row);
+    const desc      = getDesc(row);
+    const eventType = fv(row, COL.eventType) || 'Event';
+    const cancelled = isCancelled(row);
+    const startTs   = fv(row, COL.startTime);
+
+    const mo = fmtMonthYear(d);
+    if (mo !== curMonth) {
+      if (openList) inner += '</ul></div>\n';
+      curMonth = mo;
+      openList = true;
+      inner += `<div class="month-group"><h3>${esc(mo)}</h3><ul class="skim-list">`;
+    }
+
+    let line = `${esc(fmtDayDate(d))}${startTs ? ' ' + esc(abbrevTime(startTs)) : ''} &nbsp; ${esc(desc)}`;
+    if (desc.toLowerCase() !== eventType.toLowerCase())
+      line += ` <span class="skim-type">(${esc(eventType)})</span>`;
+    if (cancelled) line += ' &nbsp; &#x274C; CANCELLED';
+
+    inner += `<li class="skim-item${cancelled ? ' cancelled' : ''}">${line}</li>`;
+  });
+
+  if (openList) inner += '</ul></div>';
+
+  return `<section class="bulletin-section">
+<h2>Looking Ahead</h2>
+${inner}
+</section>`;
+}
+
+// ── Calendar Grid (3 months) ──────────────────────────────────────────────
+function calendarGrid(allRows, today) {
+  const evMap = {};
+  allRows.forEach(row => {
+    const ds = normDateStr(fv(row, COL.date));
+    if (!ds || isCancelled(row)) return;
+    if (!evMap[ds]) evMap[ds] = [];
+    evMap[ds].push(fv(row, COL.eventType).toLowerCase() || 'other');
+  });
+
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = `<hr class="section-rule">
+<section class="bulletin-section">
+<h2>Calendar</h2>
+<p class="calendar-legend">
+  <span><span class="leg-swatch bg-class"></span>Class</span>
+  <span><span class="leg-swatch bg-service"></span>Service</span>
+  <span><span class="leg-swatch bg-competition"></span>Competition</span>
+  <span><span class="leg-swatch bg-workday"></span>Workday</span>
+  <span><span class="leg-swatch bg-fieldtrip"></span>Field Trip</span>
+</p>`;
+
+  for (let mo = 0; mo < 3; mo++) {
+    const ms       = new Date(today.getFullYear(), today.getMonth() + mo, 1);
+    const daysInMo = new Date(ms.getFullYear(), ms.getMonth() + 1, 0).getDate();
+    const yr       = ms.getFullYear();
+    const moNum    = ms.getMonth() + 1;
+
+    html += `<div class="month-calendar"><h3>${esc(fmtMonthYear(ms))}</h3>
+<table class="cal-table">
+<thead><tr>${DOW.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+<tbody>`;
+
+    let dayNum = 1 - ms.getDay();
+    while (dayNum <= daysInMo) {
+      html += '<tr>';
+      for (let dow = 0; dow < 7; dow++, dayNum++) {
+        if (dayNum < 1 || dayNum > daysInMo) {
+          html += '<td class="empty"></td>';
+        } else {
+          const key   = `${yr}-${String(moNum).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+          const types = evMap[key] || [];
+          const bgCls = types.length ? (TYPE_BG[types[0]] || 'bg-other') : '';
+
+          html += `<td${bgCls ? ` class="${bgCls}"` : ''}><span class="cal-date">${dayNum}</span>`;
+          types.forEach(t => {
+            html += `<span class="cal-event">${esc(TYPE_ABBREV[t] || t)}</span>`;
+          });
+          html += '</td>';
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+  }
+
+  html += '</section>';
+  return html;
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+function renderNewsletter(allRows) {
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const cutoff = new Date(today.getTime() + WEEKS_AHEAD * 7 * 86400000);
+
+  const detailRows = [], skimRows = [];
+
+  allRows.forEach(row => {
+    const d = parseRowDate(row);
+    if (!d) return;
+    const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (dateOnly >= today && dateOnly <= cutoff) {
+      if (!isCancelled(row)) detailRows.push(row);
+      skimRows.push(row);
+    }
+  });
+
+  detailRows.sort((a,b) => parseRowDate(a) - parseRowDate(b));
+  skimRows.sort((a,b)   => parseRowDate(a) - parseRowDate(b));
+
+  const ds   = fmt(today, {month:'long', day:'numeric', year:'numeric'});
+  const parts = [masthead(today)];
+  if (detailRows.length) parts.push(comingUp(detailRows.slice(0, DETAIL_COUNT)));
+  if (skimRows.length)   parts.push(lookingAhead(skimRows));
+  parts.push(calendarGrid(allRows, today));
+  parts.push(`<footer class="bulletin-footer">Generated ${esc(ds)} &nbsp;&middot;&nbsp; ROV Club</footer>`);
+
+  document.getElementById('bulletin').innerHTML = parts.join('\n');
+  document.getElementById('bulletin-loading').style.display = 'none';
+  document.getElementById('bulletin').style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (CSV_URL === 'PASTE_YOUR_PUBLISHED_CSV_URL_HERE') {
+    document.getElementById('bulletin-loading').textContent =
+      'CSV_URL not configured — see assets/js/rov-common.js.';
+    return;
+  }
+
+  fetch(CSV_URL)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(text => {
+      const rows = parseCSV(text).slice(1).filter(r => r.length > COL.startTime);
+      renderNewsletter(rows);
+    })
+    .catch(() => {
+      document.getElementById('bulletin-loading').textContent =
+        'Could not load events. Make sure the sheet is published to the web.';
+    });
+});
+</script>

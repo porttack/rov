@@ -1,0 +1,133 @@
+---
+layout: page
+title: Calendar
+permalink: /calendar/
+---
+
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css' rel='stylesheet' />
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+
+<style>
+  #calendar-wrap { max-width: 900px; margin: 0 auto; }
+  #calendar-error { text-align: center; padding: 2em; color: #c00; }
+  .fc .fc-button-primary               { background: #17458F; border-color: #17458F; }
+  .fc .fc-button-primary:hover          { background: #1a56db; border-color: #1a56db; }
+  .fc .fc-button-primary:not(:disabled).fc-button-active
+                                        { background: #0f2d5e; border-color: #0f2d5e; }
+  .ev-cancelled                         { opacity: 0.5; text-decoration: line-through; }
+
+  /* Legend */
+  .cal-legend { margin: 0.6em 0 1.2em; font-size: 0.85em; color: #555; display: flex; flex-wrap: wrap; gap: 0.8em; }
+  .leg-item { display: flex; align-items: center; gap: 0.3em; }
+  .leg-dot  { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+</style>
+
+<div id="calendar-loading" style="text-align:center;padding:2em;color:#666;">Loading calendar&hellip;</div>
+<div id="calendar-error"  style="display:none"></div>
+<div id="calendar-wrap"   style="display:none">
+  <div class="cal-legend">
+    <span class="leg-item"><span class="leg-dot" style="background:#3b82f6"></span>Class</span>
+    <span class="leg-item"><span class="leg-dot" style="background:#f97316"></span>Service</span>
+    <span class="leg-item"><span class="leg-dot" style="background:#22c55e"></span>Competition</span>
+    <span class="leg-item"><span class="leg-dot" style="background:#eab308"></span>Workday</span>
+    <span class="leg-item"><span class="leg-dot" style="background:#9333ea"></span>Field Trip</span>
+    <span class="leg-item"><span class="leg-dot" style="background:#9ca3af"></span>Cancelled</span>
+  </div>
+  <div id="calendar"></div>
+</div>
+
+<script src="{{ '/assets/js/rov-common.js' | relative_url }}"></script>
+<script>
+const TYPE_COLORS = {
+  'class':       '#3b82f6',
+  'service':     '#f97316',
+  'competition': '#22c55e',
+  'workday':     '#eab308',
+  'fieldtrip':   '#9333ea',
+};
+const CANCELLED_COLOR = '#9ca3af';
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (CSV_URL === 'PASTE_YOUR_PUBLISHED_CSV_URL_HERE') {
+    document.getElementById('calendar-loading').style.display = 'none';
+    document.getElementById('calendar-error').style.display   = 'block';
+    document.getElementById('calendar-error').textContent     =
+      'CSV_URL not configured — see assets/js/rov-common.js.';
+    return;
+  }
+
+  fetch(CSV_URL)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(text => {
+      const rows   = parseCSV(text).slice(1).filter(r => r.length > COL.startTime);
+      const events = [];
+
+      rows.forEach(row => {
+        const dateStr = fv(row, COL.date);
+        if (!dateStr) return;
+
+        const cancelled = isCancelled(row);
+        const eventType = fv(row, COL.eventType).toLowerCase();
+        const desc      = getDesc(row);
+        const startTs   = fv(row, COL.startTime);
+        const endTs     = fv(row, COL.endTime);
+        const iso       = normDateStr(dateStr);
+        const start     = startTs ? `${iso}T${to24h(startTs)}` : iso;
+        const end       = endTs   ? `${iso}T${to24h(endTs)}`   : undefined;
+        const color     = cancelled ? CANCELLED_COLOR : (TYPE_COLORS[eventType] || '#6b7280');
+
+        events.push({
+          title: desc || eventType || 'Event',
+          start, end, color,
+          classNames: cancelled ? ['ev-cancelled'] : [],
+          extendedProps: { eventType, cancelled, desc, startTs, endTs,
+            summary:  fv(row, COL.summary),
+            comments: fv(row, COL.comments),
+            picture:  fv(row, COL.picture) },
+        });
+      });
+
+      document.getElementById('calendar-loading').style.display = 'none';
+      document.getElementById('calendar-wrap').style.display    = 'block';
+
+      const cal = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'dayGridMonth',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+        events,
+
+        eventDidMount(info) {
+          const p     = info.event.extendedProps;
+          const lines = [info.event.title];
+          if (p.eventType && p.eventType !== info.event.title.toLowerCase()) lines.push(p.eventType);
+          if (p.summary)  lines.push(p.summary);
+          if (p.comments) lines.push('Notes: ' + p.comments);
+          if (p.cancelled) lines.push('CANCELLED');
+          info.el.title = lines.join('\n');
+        },
+
+        eventClick(info) {
+          info.jsEvent.preventDefault();
+          const p       = info.event.extendedProps;
+          const timeStr = p.startTs
+            ? (p.endTs ? abbrevTime(p.startTs) + ' – ' + abbrevTime(p.endTs) : abbrevTime(p.startTs))
+            : '';
+          const lines   = [info.event.title];
+          if (p.eventType && p.eventType !== info.event.title.toLowerCase())
+            lines.push('Type: ' + p.eventType);
+          if (timeStr)    lines.push('Time: ' + timeStr);
+          if (p.summary)  lines.push('\n' + p.summary);
+          if (p.comments) lines.push('Notes: ' + p.comments);
+          if (p.cancelled) lines.push('\n[CANCELLED]');
+          alert(lines.join('\n'));
+        },
+      });
+      cal.render();
+    })
+    .catch(() => {
+      document.getElementById('calendar-loading').style.display = 'none';
+      document.getElementById('calendar-error').style.display   = 'block';
+      document.getElementById('calendar-error').textContent     =
+        'Could not load calendar. Make sure the sheet is published to the web.';
+    });
+});
+</script>
