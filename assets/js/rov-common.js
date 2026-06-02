@@ -6,7 +6,7 @@ const CSV_URL = 'PASTE_YOUR_PUBLISHED_CSV_URL_HERE';
 
 // Column indices (0-based), matching spreadsheet column order:
 // A: Event type | B: Cancelled | C: Date | D: Start Time | E: End Time
-// F: Description | G: Summary | H: Picture | I: Comments
+// F: Description | G: Summary | H: Picture | I: Comments | J: Location
 const COL = {
   eventType:   0,
   cancelled:   1,
@@ -17,6 +17,7 @@ const COL = {
   summary:     6,
   picture:     7,
   comments:    8,
+  location:    9,
 };
 
 // ── Parsing ───────────────────────────────────────────────────────────────
@@ -108,6 +109,12 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function textToHtml(s) { return esc(s).replace(/\n/g,'<br>'); }
+
+function mapLink(location) {
+  if (!location) return '';
+  const url = `https://maps.google.com/?q=${encodeURIComponent(location)}`;
+  return `<a href="${url}" target="_blank" rel="noopener">${esc(location)}</a>`;
+}
 
 // ── Formatting ────────────────────────────────────────────────────────────
 

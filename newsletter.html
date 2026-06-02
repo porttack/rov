@@ -82,12 +82,14 @@ permalink: /newsletter/
   .cal-date  { font-weight: bold; display: block; margin-bottom: 1px; }
   .cal-event { font-size: 0.82em; display: block; line-height: 1.3; }
 
-  .bg-class       { background: #c7d7fb; }
-  .bg-service     { background: #fed7aa; }
-  .bg-competition { background: #bbf7d0; }
-  .bg-workday     { background: #fef9c3; }
-  .bg-fieldtrip   { background: #e9d5ff; }
-  .bg-other       { background: #f3f4f6; }
+  .bg-class        { background: #c7d7fb; }
+  .bg-service      { background: #fed7aa; }
+  .bg-competition  { background: #bbf7d0; }
+  .bg-workday      { background: #fef9c3; }
+  .bg-fieldtrip    { background: #e9d5ff; }
+  .bg-mentors      { background: #fce7f3; }
+  .bg-presentation { background: #ccfbf1; }
+  .bg-other        { background: #f3f4f6; }
 
   .bulletin-footer {
     margin-top: 2em; padding-top: 0.5em; border-top: 1px solid #ddd;
@@ -116,12 +118,13 @@ const WEEKS_AHEAD  = 8;   // skim list horizon
 const TYPE_BG = {
   'class': 'bg-class', 'service': 'bg-service',
   'competition': 'bg-competition', 'workday': 'bg-workday',
-  'fieldtrip': 'bg-fieldtrip',
+  'fieldtrip': 'bg-fieldtrip', 'mentors': 'bg-mentors',
+  'presentation': 'bg-presentation', 'other': 'bg-other',
 };
 const TYPE_ABBREV = {
-  'class': 'Class', 'service': 'Service',
-  'competition': 'Comp', 'workday': 'Workday',
-  'fieldtrip': 'Trip',
+  'class': 'Class', 'service': 'Service', 'competition': 'Comp',
+  'workday': 'Workday', 'fieldtrip': 'Trip', 'mentors': 'Mentors',
+  'presentation': 'Pres', 'other': 'Other',
 };
 
 // ── Masthead ──────────────────────────────────────────────────────────────
@@ -142,6 +145,7 @@ function comingUp(rows) {
     const summary   = fv(row, COL.summary);
     const picture   = fv(row, COL.picture);
     const comments  = fv(row, COL.comments);
+    const location  = fv(row, COL.location);
     const startTs   = fv(row, COL.startTime);
     const endTs     = fv(row, COL.endTime);
 
@@ -149,9 +153,14 @@ function comingUp(rows) {
       ? (endTs ? `${abbrevTime(startTs)}–${abbrevTime(endTs)}` : abbrevTime(startTs))
       : '';
 
+    const metaParts = [esc(fmtLong(d))];
+    if (timeStr)   metaParts.push(esc(timeStr));
+    if (location)  metaParts.push(`&#x1F4CD; ${mapLink(location)}`);
+    metaParts.push(`<em>${esc(eventType)}</em>`);
+
     let html = `<div class="event-block">
   <h3 class="event-heading">${esc(fmtShort(d))}: ${esc(desc)}</h3>
-  <p class="event-meta">${esc(fmtLong(d))}${timeStr ? ' &nbsp;&middot;&nbsp; ' + esc(timeStr) : ''} &nbsp;&middot;&nbsp; <em>${esc(eventType)}</em></p>`;
+  <p class="event-meta">${metaParts.join(' &nbsp;&middot;&nbsp; ')}</p>`;
 
     if (picture && picture.startsWith('http')) {
       html += `\n  <img src="${esc(picture)}" alt="${esc(desc)}" class="event-photo" loading="lazy" onerror="this.style.display='none'">`;
@@ -179,6 +188,7 @@ function lookingAhead(rows) {
     const desc      = getDesc(row);
     const eventType = fv(row, COL.eventType) || 'Event';
     const cancelled = isCancelled(row);
+    const location  = fv(row, COL.location);
     const startTs   = fv(row, COL.startTime);
 
     const mo = fmtMonthYear(d);
@@ -192,6 +202,8 @@ function lookingAhead(rows) {
     let line = `${esc(fmtDayDate(d))}${startTs ? ' ' + esc(abbrevTime(startTs)) : ''} &nbsp; ${esc(desc)}`;
     if (desc.toLowerCase() !== eventType.toLowerCase())
       line += ` <span class="skim-type">(${esc(eventType)})</span>`;
+    if (location && !cancelled)
+      line += ` <span class="skim-type">&nbsp;&#x1F4CD; ${mapLink(location)}</span>`;
     if (cancelled) line += ' &nbsp; &#x274C; CANCELLED';
 
     inner += `<li class="skim-item${cancelled ? ' cancelled' : ''}">${line}</li>`;
@@ -225,6 +237,9 @@ function calendarGrid(allRows, today) {
   <span><span class="leg-swatch bg-competition"></span>Competition</span>
   <span><span class="leg-swatch bg-workday"></span>Workday</span>
   <span><span class="leg-swatch bg-fieldtrip"></span>Field Trip</span>
+  <span><span class="leg-swatch bg-mentors"></span>Mentors</span>
+  <span><span class="leg-swatch bg-presentation"></span>Presentation</span>
+  <span><span class="leg-swatch bg-other"></span>Other</span>
 </p>`;
 
   for (let mo = 0; mo < 3; mo++) {

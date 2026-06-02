@@ -6,8 +6,8 @@
 // 3. Run "setupSheet" from the function dropdown and authorize when prompted
 // 4. Reload the spreadsheet — you will see the ROV menu
 //
-// COLUMNS (A–J)
-//   A: Event type  (class | service | competition | workday | fieldtrip)
+// COLUMNS (A–K)
+//   A: Event type  (class | service | competition | workday | fieldtrip | mentors | presentation | other)
 //   B: Cancelled   (checkbox — checked = cancelled)
 //   C: Date
 //   D: Start Time
@@ -16,7 +16,8 @@
 //   G: Summary
 //   H: Picture URL
 //   I: Comments
-//   J: Calendar Event ID  ← auto-managed, do not edit
+//   J: Location    (optional — used in Google Calendar sync)
+//   K: Calendar Event ID  ← auto-managed, do not edit
 
 const SHEET_NAME  = 'Calendar';  // Change to match your tab name exactly
 const CALENDAR_ID = 'c_148f1519506e3d16ae70587c9b7790fc5aa331e2cfd689a0e73fe707a72e0ecb@group.calendar.google.com'; // 'primary' = your main Google Calendar
@@ -32,21 +33,25 @@ const C_DESC  = 6;
 const C_SUM   = 7;
 const C_PIC   = 8;
 const C_COMM  = 9;
-const C_CALID = 10;
+const C_LOC   = 10;
+const C_CALID = 11;
 
 const HEADERS = [
   'Event Type', 'Cancelled', 'Date', 'Start Time', 'End Time',
-  'Description', 'Summary', 'Picture URL', 'Comments', 'Calendar Event ID'
+  'Description', 'Summary', 'Picture URL', 'Comments', 'Location', 'Calendar Event ID'
 ];
 
-const EVENT_TYPES = ['class', 'service', 'competition', 'workday', 'fieldtrip'];
+const EVENT_TYPES = ['class', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'other'];
 
 const TYPE_COLORS = {
-  'class':       '#c7d7fb',  // light blue
-  'service':     '#fed7aa',  // light orange
-  'competition': '#bbf7d0',  // light green
-  'workday':     '#fef9c3',  // light yellow
-  'fieldtrip':   '#e9d5ff',  // light purple
+  'class':        '#c7d7fb',  // light blue
+  'service':      '#fed7aa',  // light orange
+  'competition':  '#bbf7d0',  // light green
+  'workday':      '#fef9c3',  // light yellow
+  'fieldtrip':    '#e9d5ff',  // light purple
+  'mentors':      '#fce7f3',  // light pink
+  'presentation': '#ccfbf1',  // light teal
+  'other':        '#f3f4f6',  // light gray
 };
 const CANCELLED_BG = '#e5e7eb';
 const CANCELLED_FG = '#888888';
@@ -97,6 +102,7 @@ function setupSheet() {
   sheet.setFrozenRows(1);
   sheet.setColumnWidth(C_CALID, 160);
   sheet.getRange(1, C_CALID).setNote('Auto-managed by script — do not edit.');
+  sheet.getRange(1, C_LOC).setNote('Optional: used as the location in Google Calendar events.');
 
   // Add dropdowns and checkboxes
   addValidation_(sheet);
@@ -110,16 +116,17 @@ function setupSheet() {
 }
 
 function addValidation_(sheet) {
-  const lastRow = Math.max(sheet.getLastRow(), 2);
+  // Cover 500 rows so dropdowns and checkboxes are ready for new entries.
+  const numRows = Math.max(sheet.getLastRow() - 1, 500);
 
-  sheet.getRange(2, C_TYPE, lastRow - 1, 1).setDataValidation(
+  sheet.getRange(2, C_TYPE, numRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireValueInList(EVENT_TYPES, true)
       .setAllowInvalid(false)
       .build()
   );
 
-  sheet.getRange(2, C_CANC, lastRow - 1, 1).setDataValidation(
+  sheet.getRange(2, C_CANC, numRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireCheckbox()
       .build()
@@ -165,7 +172,18 @@ function onEditTrigger(e) {
   if (!sheet || e.range.getSheet().getName() !== SHEET_NAME) return;
   const row = e.range.getRow();
   if (row < 2) return;
+
   const vals = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+
+  // If Event Type is blank on a new row, carry it down from the row above.
+  if (!vals[C_TYPE - 1] && row > 2) {
+    const prevType = String(sheet.getRange(row - 1, C_TYPE).getValue() || '').trim();
+    if (prevType) {
+      sheet.getRange(row, C_TYPE).setValue(prevType);
+      vals[C_TYPE - 1] = prevType;
+    }
+  }
+
   colorRow_(sheet, row, HEADERS.length,
     String(vals[C_TYPE - 1] || '').toLowerCase().trim(),
     isCancelledVal_(vals[C_CANC - 1]));
@@ -242,6 +260,7 @@ function syncToCalendar() {
     const desc      = String(row[C_DESC  - 1] || eventType).trim();
     const summary   = String(row[C_SUM   - 1] || '').trim();
     const comments  = String(row[C_COMM  - 1] || '').trim();
+    const location  = String(row[C_LOC   - 1] || '').trim();
     let   calId     = String(row[C_CALID - 1] || '').trim();
 
     if (!eventType && !dateVal) { skipped++; continue; } // blank row
@@ -260,9 +279,12 @@ function syncToCalendar() {
 
     const title    = eventType ? `[${eventType}] ${desc}` : desc;
     const details  = [summary, comments].filter(Boolean).join('\n\n');
+    const opts     = { description: details };
     const endDt    = endVal ? buildDt_(dateVal, endVal) : null;
     const isAllDay = !startVal;
     const fallbackEnd = new Date(startDt.getTime() + 3600000); // +1 h
+
+    if (location) opts.location = location;
 
     // Update existing event
     if (calId) {
@@ -272,6 +294,7 @@ function syncToCalendar() {
           ev.setTitle(title);
           if (!isAllDay) ev.setTime(startDt, endDt || fallbackEnd);
           ev.setDescription(details);
+          if (location) ev.setLocation(location);
           updated++;
           continue;
         }
@@ -280,8 +303,8 @@ function syncToCalendar() {
 
     // Create new event
     const newEv = isAllDay
-      ? cal.createAllDayEvent(title, startDt, { description: details })
-      : cal.createEvent(title, startDt, endDt || fallbackEnd, { description: details });
+      ? cal.createAllDayEvent(title, startDt, opts)
+      : cal.createEvent(title, startDt, endDt || fallbackEnd, opts);
     sheet.getRange(i + 1, C_CALID).setValue(newEv.getId());
     created++;
     Utilities.sleep(100); // stay within API quota
@@ -342,8 +365,9 @@ function showCalendarHelp() {
       <li>Save, then run <b>ROV → Sync to Google Calendar</b></li>
     </ol>
     <p><b>First sync:</b> Apps Script will ask permission to access your calendar — click <b>Allow</b>.</p>
-    <p><b>How it works:</b> Each synced event gets an ID stored in column J.
-       Run Sync again after edits to push changes. Cancelled events are removed from the calendar automatically.</p>
+    <p><b>How it works:</b> Each synced event gets an ID stored in column K.
+       Run Sync again after edits to push changes. Cancelled events are removed from the calendar automatically.
+       Fill in column J (Location) to set a location on the calendar event.</p>
   `).setWidth(500).setHeight(420);
   SpreadsheetApp.getUi().showModalDialog(html, 'Calendar Sync Help');
 }
