@@ -10,11 +10,36 @@ permalink: /calendar/
 <style>
   #calendar-wrap { max-width: 900px; margin: 0 auto; }
   #calendar-error { text-align: center; padding: 2em; color: #c00; }
+
+  /* Toolbar buttons */
   .fc .fc-button-primary               { background: #17458F; border-color: #17458F; }
   .fc .fc-button-primary:hover          { background: #1a56db; border-color: #1a56db; }
   .fc .fc-button-primary:not(:disabled).fc-button-active
                                         { background: #0f2d5e; border-color: #0f2d5e; }
   .ev-cancelled                         { opacity: 0.5; text-decoration: line-through; }
+
+  /* Custom event tile content */
+  .fc-ev-time {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-size: 0.78em;
+    font-weight: normal;
+    line-height: 1.25;
+    opacity: 0.92;
+  }
+  .fc-ev-desc {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-size: 0.82em;
+    font-weight: normal;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* List view title */
+  .fc .fc-list-event-title a {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-weight: normal;
+  }
 
   /* Legend */
   .cal-legend { margin: 0.6em 0 1.2em; font-size: 0.85em; color: #555; display: flex; flex-wrap: wrap; gap: 0.8em; }
@@ -83,18 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const start     = startTs ? `${iso}T${to24h(startTs)}` : iso;
         const end       = endTs   ? `${iso}T${to24h(endTs)}`   : undefined;
         const color     = cancelled ? CANCELLED_COLOR : (TYPE_COLORS[eventType] || '#6b7280');
-
-        // Build abbreviated time prefix, e.g. "3p-5p"
-        const timeStr = startTs
+        const timeStr   = startTs
           ? (endTs ? `${abbrevTime(startTs)}-${abbrevTime(endTs)}` : abbrevTime(startTs))
           : '';
-        const title = timeStr ? `${timeStr} ${desc}` : desc;
 
         events.push({
-          title,
+          title: timeStr ? `${timeStr} ${desc}` : desc,  // used by list view
           start, end, color,
           classNames: cancelled ? ['ev-cancelled'] : [],
-          extendedProps: { eventType, cancelled, desc, startTs, endTs,
+          extendedProps: { eventType, cancelled, desc, timeStr,
             summary:  fv(row, COL.summary),
             comments: fv(row, COL.comments) },
         });
@@ -104,16 +126,30 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('calendar-wrap').style.display    = 'block';
 
       const cal = new FullCalendar.Calendar(document.getElementById('calendar'), {
-        initialView: 'dayGridMonth',
-        displayEventTime: false,  // time is already in the event title
+        initialView:      'dayGridMonth',
+        displayEventTime: false,   // time is in the title / our custom content
+        contentHeight:    'auto',  // expand to fit all events — no scrollbar
+        dayMaxEvents:     false,   // show every event, no "+N more" links
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
         events,
 
+        // Month grid: render time on first line, description on second
+        eventContent(info) {
+          if (info.view.type !== 'dayGridMonth') return true; // list view uses default
+          const p = info.event.extendedProps;
+          const timeHtml = p.timeStr
+            ? `<div class="fc-ev-time">${esc(p.timeStr)}</div>`
+            : '';
+          return { html: timeHtml + `<div class="fc-ev-desc">${esc(p.desc)}</div>` };
+        },
+
         eventDidMount(info) {
           const p     = info.event.extendedProps;
-          const lines = [info.event.title];
-          if (p.summary)  lines.push(p.summary);
-          if (p.comments) lines.push('Notes: ' + p.comments);
+          const lines = [];
+          if (p.timeStr) lines.push(p.timeStr);
+          lines.push(p.desc);
+          if (p.summary)   lines.push(p.summary);
+          if (p.comments)  lines.push('Notes: ' + p.comments);
           if (p.cancelled) lines.push('CANCELLED');
           info.el.title = lines.join('\n');
         },
@@ -121,9 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
         eventClick(info) {
           info.jsEvent.preventDefault();
           const p     = info.event.extendedProps;
-          const lines = [info.event.title];
-          if (p.summary)  lines.push('\n' + p.summary);
-          if (p.comments) lines.push('Notes: ' + p.comments);
+          const lines = [];
+          if (p.timeStr) lines.push(p.timeStr);
+          lines.push(p.desc);
+          if (p.summary)   lines.push('\n' + p.summary);
+          if (p.comments)  lines.push('Notes: ' + p.comments);
           if (p.cancelled) lines.push('\nCANCELLED');
           alert(lines.join('\n'));
         },
