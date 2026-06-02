@@ -2,6 +2,12 @@
 
 Website for the **San Lorenzo Valley ROV Club**, taught by Eric Brown at San Lorenzo Valley schools. Hosted on GitHub Pages at [rov.porttack.com](https://rov.porttack.com).
 
+| Resource | Link |
+|---|---|
+| Live site | [rov.porttack.com](https://rov.porttack.com) |
+| Event spreadsheet | [Google Sheet](https://docs.google.com/spreadsheets/d/1SLUNLWSTkfGSynF8cHlQ_-DTQtXsS1t6KsRQ4U6am7k/edit?usp=sharing) (read-only) |
+| Google Calendar | [ROV Club Calendar](https://calendar.google.com/calendar/u/0/embed?src=c_148f1519506e3d16ae70587c9b7790fc5aa331e2cfd689a0e73fe707a72e0ecb@group.calendar.google.com&ctz=America/Los_Angeles) |
+
 Everything here is **driven by a single Google Sheet** that Eric manages. The website reads from that sheet automatically — no one needs to touch the website itself after initial setup.
 
 The site provides three views of the same event data:
