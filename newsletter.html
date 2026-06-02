@@ -132,7 +132,7 @@ const TYPE_ABBREV = {
 function masthead(today) {
   const ds = fmt(today, {month:'long', day:'numeric', year:'numeric'});
   return `<header class="masthead">
-  <h1>ROV Club</h1>
+  <h1>SLV ROV</h1>
   <p class="masthead-sub">Events &amp; Newsletter &nbsp;&middot;&nbsp; ${esc(ds)}</p>
 </header>`;
 }
@@ -307,7 +307,7 @@ function renderNewsletter(allRows) {
   if (detailRows.length) parts.push(comingUp(detailRows.slice(0, DETAIL_COUNT)));
   if (skimRows.length)   parts.push(lookingAhead(skimRows));
   parts.push(calendarGrid(allRows, today));
-  parts.push(`<footer class="bulletin-footer">Generated ${esc(ds)} &nbsp;&middot;&nbsp; ROV Club</footer>`);
+  parts.push(`<footer class="bulletin-footer">Generated ${esc(ds)} &nbsp;&middot;&nbsp; SLV ROV</footer>`);
 
   document.getElementById('bulletin').innerHTML = parts.join('\n');
   document.getElementById('bulletin-loading').style.display = 'none';

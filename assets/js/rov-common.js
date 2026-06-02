@@ -1,4 +1,4 @@
-// Shared utilities for ROV Club website pages (calendar.html, newsletter.html)
+// Shared utilities for SLV ROV website pages (calendar.html, newsletter.html)
 
 // Replace this with your sheet's "Publish to web" CSV URL.
 // In your spreadsheet: File → Share → Publish to web → CSV → copy URL.

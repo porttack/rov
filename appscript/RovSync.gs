@@ -1,4 +1,4 @@
-// RovSync.gs — ROV Club spreadsheet utilities
+// RovSync.gs — SLV ROV spreadsheet utilities
 //
 // INSTALLATION
 // 1. In your Google Sheet: Extensions > Apps Script
