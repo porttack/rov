@@ -54,12 +54,12 @@ const getDesc = row => fv(row, COL.description) || fv(row, COL.eventType);
 
 // ── Date / time helpers ───────────────────────────────────────────────────
 
-// "3/18/2026" → "2026-03-18"
+// "3/18/2026" or "3/18/26" → "2026-03-18"
 function normDateStr(ds) {
-  const m = ds.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  return m
-    ? `${m[3]}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`
-    : ds;
+  const m = ds.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return ds;
+  const year = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+  return `${year}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
 }
 
 function to24h(t) {
