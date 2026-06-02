@@ -93,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         events.push({
           title,
           start, end, color,
-          displayEventTime: false,  // time is already in title
           classNames: cancelled ? ['ev-cancelled'] : [],
           extendedProps: { eventType, cancelled, desc, startTs, endTs,
             summary:  fv(row, COL.summary),
@@ -106,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const cal = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
+        displayEventTime: false,  // time is already in the event title
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
         events,
 
