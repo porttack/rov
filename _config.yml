@@ -12,6 +12,7 @@ minima:
 header_pages:
   - calendar.html
   - newsletter.html
+  - year.html
 
 plugins:
   - jekyll-feed
