@@ -52,8 +52,8 @@ const TYPE_COLORS = {
   'fieldtrip':    '#e9d5ff',  // light purple
   'mentors':      '#fce7f3',  // light pink
   'presentation': '#ccfbf1',  // light teal
-  'noschool':     '#fee2e2',  // light red
-  'other':        '#f3f4f6',  // light gray
+  'noschool':     '#f3f4f6',  // light gray
+  'other':        '#fee2e2',  // light red
 };
 const CANCELLED_BG = '#e5e7eb';
 const CANCELLED_FG = '#888888';
