@@ -79,6 +79,13 @@ permalink: /year/
     <span class="leg-item"><span class="leg-swatch" style="background:#f3f4f6"></span>No School</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#fee2e2"></span>Other</span>
   </div>
+  <!-- June-only row: visible only when the current month is June -->
+  <div class="year-columns" id="june-row" style="display:none">
+    <div class="year-col" id="col-june"></div>
+    <div class="year-col"></div><!-- empty right column -->
+  </div>
+  <hr id="june-divider" style="display:none; border:none; border-top:1px solid #e0e0e0; margin:0.2em 0 1em;">
+  <!-- Normal 12-month school-year grid -->
   <div class="year-columns">
     <div class="year-col" id="col-left"></div>
     <div class="year-col" id="col-right"></div>
@@ -130,19 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('year-loading').textContent = 'No events found.';
         return;
       }
-      // July–June school year: Jan–May → show prev July; Jun–Dec → show current July
-      const now        = new Date();
-      const startYear  = now.getMonth() <= 4 ? now.getFullYear() - 1 : now.getFullYear();
-      const startMonth = 6; // July (0-based)
-
+      // Build HTML for a single month grid
       const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-      const leftCol  = document.getElementById('col-left');
-      const rightCol = document.getElementById('col-right');
-
-      for (let mo = 0; mo < 12; mo++) {
-        const ms       = new Date(startYear, startMonth + mo, 1);
+      function buildMonthHtml(ms) {
         const yr       = ms.getFullYear();
-        const moIdx    = ms.getMonth();          // 0-based
+        const moIdx    = ms.getMonth();
         const daysInMo = new Date(yr, moIdx + 1, 0).getDate();
         const moLabel  = ms.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -152,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <thead><tr>${DOW.map(d => `<th>${d}</th>`).join('')}</tr></thead>
 <tbody>`;
 
-        let dayNum = 1 - ms.getDay(); // may be negative (empty leading cells)
+        let dayNum = 1 - ms.getDay();
         while (dayNum <= daysInMo) {
           html += '<tr>';
           for (let dow = 0; dow < 7; dow++, dayNum++) {
@@ -161,16 +160,32 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
               const key = `${yr}-${String(moIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const cls = dayCls[key];
-              html += cls
-                ? `<td class="${cls}">${dayNum}</td>`
-                : `<td>${dayNum}</td>`;
+              html += cls ? `<td class="${cls}">${dayNum}</td>` : `<td>${dayNum}</td>`;
             }
           }
           html += '</tr>';
         }
+        return html + '</tbody></table></div>';
+      }
 
-        html += '</tbody></table></div>';
-        (mo < 6 ? leftCol : rightCol).insertAdjacentHTML('beforeend', html);
+      // July–June school year: Jan–May → show prev July; Jun–Dec → show current July
+      const now        = new Date();
+      const startYear  = now.getMonth() <= 4 ? now.getFullYear() - 1 : now.getFullYear();
+      const startMonth = 6; // July (0-based)
+
+      // June special case: show current June alone above the 12-month grid
+      if (now.getMonth() === 5) {
+        document.getElementById('col-june').insertAdjacentHTML('beforeend',
+          buildMonthHtml(new Date(now.getFullYear(), 5, 1)));
+        document.getElementById('june-row').style.display      = '';
+        document.getElementById('june-divider').style.display  = '';
+      }
+
+      const leftCol  = document.getElementById('col-left');
+      const rightCol = document.getElementById('col-right');
+      for (let mo = 0; mo < 12; mo++) {
+        const ms = new Date(startYear, startMonth + mo, 1);
+        (mo < 6 ? leftCol : rightCol).insertAdjacentHTML('beforeend', buildMonthHtml(ms));
       }
 
       document.getElementById('year-loading').style.display = 'none';
