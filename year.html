@@ -18,16 +18,28 @@ permalink: /year/
     display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);
   }
 
-  /* Two-column layout: left half / right half */
+  /* Month grid. Default: two columns filled top-to-bottom (Jul–Dec left,
+     Jan–Jun right). Over 1024px: 4 wide x 3 high, filled left-to-right.
+     Phones: one column. */
   .year-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0 2.8em;
+    grid-template-rows: repeat(6, auto);
+    grid-auto-flow: column;
+    gap: 1em 2.8em;
+  }
+  @media (min-width: 1025px) {
+    #year-wrap { max-width: 1120px; }
+    .year-columns {
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: none;
+      grid-auto-flow: row;
+      gap: 1.2em 1.8em;
+    }
   }
   @media (max-width: 560px) {
-    .year-columns { grid-template-columns: 1fr; }
+    .year-columns { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
   }
-  .year-col { display: flex; flex-direction: column; gap: 1em; }
 
   .month-title {
     font-family: Arial, sans-serif; font-weight: bold;
@@ -107,10 +119,7 @@ permalink: /year/
 <div id="year-loading" style="text-align:center;padding:2em;color:#666;">Loading&hellip;</div>
 <div id="year-wrap" style="display:none">
   <!-- 12-month grid, July–June -->
-  <div class="year-columns">
-    <div class="year-col" id="col-left"></div>
-    <div class="year-col" id="col-right"></div>
-  </div>
+  <div class="year-columns" id="year-months"></div>
   <div class="year-legend">
     <span class="leg-item"><span class="leg-swatch" style="background:#93c5fd"></span>HS ROV</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</span>
@@ -233,12 +242,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const now       = new Date();
       const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
 
-      // July–Dec on the left, Jan–June on the right.
-      const leftCol  = document.getElementById('col-left');
-      const rightCol = document.getElementById('col-right');
+      // All 12 months go in one grid; CSS lays it out (see .year-columns).
+      const grid = document.getElementById('year-months');
       for (let mo = 0; mo < 12; mo++) {
-        const ms = new Date(startYear, 6 + mo, 1);
-        (mo < 6 ? leftCol : rightCol).insertAdjacentHTML('beforeend', buildMonthHtml(ms));
+        grid.insertAdjacentHTML('beforeend', buildMonthHtml(new Date(startYear, 6 + mo, 1)));
       }
 
       document.getElementById('year-loading').style.display = 'none';
