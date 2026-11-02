@@ -79,6 +79,7 @@ function onOpen() {
     .addItem('Calendar Sync Help',      'showCalendarHelp')
     .addSeparator()
     .addItem('Install Edit Trigger',    'installTriggers')
+    .addItem('Set API Token',           'setApiToken')   // RovApi.gs
     .addToUi();
 }
 

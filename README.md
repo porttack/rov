@@ -50,7 +50,8 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 | `newsletter.html` | Upcoming events detail + skim list + monthly grid |
 | `year.html` | Compact September–August annual calendar, cells colored by program |
 | `assets/js/rov-common.js` | Shared JS: CSV parser, column map, date/time helpers |
-| `appscript/RovSync.gs` | All Apps Script logic (paste into Google Sheet) |
+| `appscript/RovSync.gs` | Apps Script logic (paste into Google Sheet) |
+| `appscript/RovApi.gs` | Optional token-protected web API so Claude can read/edit the sheet (setup steps in the file header) |
 | `_includes/footer.html` | Site footer |
 | `_includes/ms-rov.html` | Middle School ROV Team info shown above the Year grid (edit yearly) |
 | `_config.yml` | Jekyll config (title, theme, nav pages) |
