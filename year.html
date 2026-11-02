@@ -54,8 +54,6 @@ permalink: /year/
   /* Day colors are set inline per program (see PROGRAM_COLORS in the script);
      two or three programs on one day get a diagonal split. */
   .month-cal td.ev-cancelled  { background: #e5e7eb; color: #aaa; }
-  .month-cal td.ev-competition { font-weight: bold; box-shadow: inset 0 0 0 2px #166534; }
-  .leg-comp { background: #fff; box-shadow: inset 0 0 0 2px #166534; }
   .month-cal td[data-date] { cursor: pointer; }
   /* Fade months that are over, and the days already gone in the current month. */
   .month-block.month-past { opacity: 0.42; }
@@ -117,10 +115,9 @@ permalink: /year/
     <span class="leg-item"><span class="leg-swatch" style="background:#93c5fd"></span>HS ROV</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#fdba74"></span>MS ROV</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage / competition</span>
     <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two programs</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</span>
-    <span class="leg-item"><span class="leg-swatch leg-comp"></span>Competition</span>
   </div>
 </div>
 
@@ -129,7 +126,8 @@ permalink: /year/
 // Program fill colors; a day with several programs is split in this order.
 const PROGRAM_COLORS = { hs: '#93c5fd', charter: '#86efac', ms: '#fdba74' };
 const PROGRAMS = Object.keys(PROGRAM_COLORS);
-const SCRIMMAGE_COLOR = '#c4b5fd';   // scrimmages (type `scrimmage`), any program
+const EVENT_COLOR = '#c4b5fd';   // scrimmages and competitions/Worlds (types `scrimmage`, `competition`), any program
+const isBigEvent = e => e.type === 'scrimmage' || e.type === 'competition';
 const HOLIDAY_COLOR = '#d1d5db';   // no-school days (gray)
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -172,14 +170,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const real = active.filter(e => e.type !== 'noschool');
         const colors = [];
         if (real.length < active.length) colors.push(HOLIDAY_COLOR);
-        if (real.some(e => e.type === 'scrimmage')) colors.push(SCRIMMAGE_COLOR);
-        const regular = real.filter(e => e.type !== 'scrimmage');
+        if (real.some(isBigEvent)) colors.push(EVENT_COLOR);
+        const regular = real.filter(e => !isBigEvent(e));
         PROGRAMS.forEach(p => { if (regular.some(e => e.program === p)) colors.push(PROGRAM_COLORS[p]); });
         const n = colors.length;
         dayStyle[iso] = n === 1 ? colors[0]
           : 'linear-gradient(135deg,' + colors.map((c, i) =>
               `${c} ${(100 * i / n).toFixed(1)}% ${(100 * (i + 1) / n).toFixed(1)}%`).join(',') + ')';
-        dayCls[iso] = real.some(e => e.type === 'competition') ? 'ev-competition' : '';
+        dayCls[iso] = '';
       });
 
       if (!Object.keys(dayCls).length) {
@@ -268,13 +266,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ev.picture && /^https?:\/\//.test(ev.picture))
         h += `<img class="tip-photo" src="${esc(ev.picture)}" alt="" loading="lazy" onerror="this.remove()">`;
       if (ev.cancelled) h += '<div style="color:#b91c1c;font-size:0.82em;font-weight:bold">CANCELLED</div>';
-      h += ev.type === 'scrimmage'
-        ? `<div class="tip-time"><span class="tip-prog" style="background:${SCRIMMAGE_COLOR}"></span>Scrimmage \u00b7 ${esc(time)}</div>`
+      h += isBigEvent(ev)
+        ? `<div class="tip-time"><span class="tip-prog" style="background:${EVENT_COLOR}"></span>${ev.type === 'competition' ? 'Competition' : 'Scrimmage'} \u00b7 ${esc(time)}</div>`
         : ev.type === 'noschool'
         ? `<div class="tip-time"><span class="tip-prog" style="background:${HOLIDAY_COLOR}"></span>School holiday</div>`
         : `<div class="tip-time"><span class="tip-prog" style="background:${PROGRAM_COLORS[ev.program]}"></span>${esc(PROG_LABEL[ev.program])} \u00b7 ${esc(time)}</div>`;
-      if (ev.type !== 'noschool' && !(ev.type === 'scrimmage' && ev.desc.toLowerCase() === 'scrimmage')) h += `<div class="tip-field">${esc(ev.desc)}</div>`;
-      if (ev.type && ev.type !== 'noschool' && ev.type !== 'scrimmage' && ev.type !== ev.desc.toLowerCase()) h += `<div class="tip-type">${esc(ev.type)}</div>`;
+      if (ev.type !== 'noschool' && !(isBigEvent(ev) && ev.desc.toLowerCase() === ev.type)) h += `<div class="tip-field">${esc(ev.desc)}</div>`;
+      if (ev.type && ev.type !== 'noschool' && !isBigEvent(ev) && ev.type !== ev.desc.toLowerCase()) h += `<div class="tip-type">${esc(ev.type)}</div>`;
       if (ev.location) h += `<div class="tip-field">${mapLink(ev.location)}</div>`;
       if (ev.summary)  h += `<div class="tip-text">${esc(ev.summary)}</div>`;
       if (ev.comments) h += `<div class="tip-text">${esc(ev.comments)}</div>`;

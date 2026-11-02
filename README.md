@@ -135,11 +135,11 @@ Enter events in the sheet, then run **ROV → Sync to Google Calendar** to push 
 | `fieldtrip` | light purple | purple | Field trips |
 | `mentors` | light pink | pink | Mentor visits or sessions |
 | `presentation` | light teal | teal | Presentations / demos |
-| `scrimmage` | light violet | — | Scrimmages (shown in violet on the Year view regardless of program) |
+| `scrimmage` | light violet | — | Scrimmages (violet on the Year view, same as competitions, regardless of program) |
 | `noschool` | light gray | — | No-school days (website only, not synced to calendar) |
 | `other` | light red | red | Anything else |
 
-In the **Year** view, color comes from the Program column rather than the event type. Event type only matters for `noschool` (gray) and `competition` (outline).
+In the **Year** view, color comes from the Program column rather than the event type. Event type only matters for `noschool` (gray) and `scrimmage`/`competition` (violet).
 
 ---
 
@@ -159,7 +159,7 @@ Dynamically generated from the CSV:
 
 ### year.html
 
-Compact two-column annual calendar showing all 12 months of the school year, July–June (June is included for Worlds). Left column: July–December; right column: January–June. Days are filled by **program** (HS blue, Charter green, MS orange); a day with more than one program is split diagonally. No-school days (from the SLVUSD 2026-27 calendar) are gray, split with a program's color if one also meets, cancelled-only days are dark gray, competition days get a bold green outline, and today is ringed in red. The only visible text is a legend below the grid; hovering a day (or tapping it on a phone, where it pins as a bottom sheet) shows a card with every event that day: program, time, description, location, summary, comments and picture. Past months fade (and are hidden on phones), as do past days in the current month. The year rolls over automatically each July (July–December show the year starting that July). MS team details live in `_includes/ms-rov.html` and are shown on the About page.
+Compact two-column annual calendar showing all 12 months of the school year, July–June (June is included for Worlds). Left column: July–December; right column: January–June. Days are filled by **program** (HS blue, Charter green, MS orange); a day with more than one program is split diagonally. No-school days (from the SLVUSD 2026-27 calendar) are gray, split with a program's color if one also meets, cancelled-only days are dark gray, scrimmages and competitions (including Worlds) are violet, and today is ringed in red. The only visible text is a legend below the grid; hovering a day (or tapping it on a phone, where it pins as a bottom sheet) shows a card with every event that day: program, time, description, location, summary, comments and picture. Past months fade (and are hidden on phones), as do past days in the current month. The year rolls over automatically each July (July–December show the year starting that July). MS team details live in `_includes/ms-rov.html` and are shown on the About page.
 
 ---
 
