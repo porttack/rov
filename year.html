@@ -116,6 +116,7 @@ permalink: /year/
     <span class="leg-item"><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#fdba74"></span>MS ROV</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage / competition</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#f9a8d4"></span>Outreach</span>
     <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two programs</span>
     <span class="leg-item"><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</span>
   </div>
@@ -126,8 +127,10 @@ permalink: /year/
 // Program fill colors; a day with several programs is split in this order.
 const PROGRAM_COLORS = { hs: '#93c5fd', charter: '#86efac', ms: '#fdba74' };
 const PROGRAMS = Object.keys(PROGRAM_COLORS);
-const EVENT_COLOR = '#c4b5fd';   // scrimmages and competitions/Worlds (types `scrimmage`, `competition`), any program
-const isBigEvent = e => e.type === 'scrimmage' || e.type === 'competition';
+// Event types with their own color (any program): scrimmages and competitions/Worlds are violet, outreach (e.g. Science Night) is pink.
+const EVENT_COLORS = { scrimmage: '#c4b5fd', competition: '#c4b5fd', outreach: '#f9a8d4' };
+const EVENT_LABELS = { scrimmage: 'Scrimmage', competition: 'Competition', outreach: 'Outreach' };
+const isBigEvent = e => e.type in EVENT_COLORS;
 const HOLIDAY_COLOR = '#d1d5db';   // no-school days (gray)
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const real = active.filter(e => e.type !== 'noschool');
         const colors = [];
         if (real.length < active.length) colors.push(HOLIDAY_COLOR);
-        if (real.some(isBigEvent)) colors.push(EVENT_COLOR);
+        [...new Set(real.filter(isBigEvent).map(e => EVENT_COLORS[e.type]))].forEach(c => colors.push(c));
         const regular = real.filter(e => !isBigEvent(e));
         PROGRAMS.forEach(p => { if (regular.some(e => e.program === p)) colors.push(PROGRAM_COLORS[p]); });
         const n = colors.length;
@@ -267,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
         h += `<img class="tip-photo" src="${esc(ev.picture)}" alt="" loading="lazy" onerror="this.remove()">`;
       if (ev.cancelled) h += '<div style="color:#b91c1c;font-size:0.82em;font-weight:bold">CANCELLED</div>';
       h += isBigEvent(ev)
-        ? `<div class="tip-time"><span class="tip-prog" style="background:${EVENT_COLOR}"></span>${ev.type === 'competition' ? 'Competition' : 'Scrimmage'} \u00b7 ${esc(time)}</div>`
+        ? `<div class="tip-time"><span class="tip-prog" style="background:${EVENT_COLORS[ev.type]}"></span>${EVENT_LABELS[ev.type]} \u00b7 ${esc(time)}</div>`
         : ev.type === 'noschool'
         ? `<div class="tip-time"><span class="tip-prog" style="background:${HOLIDAY_COLOR}"></span>School holiday</div>`
         : `<div class="tip-time"><span class="tip-prog" style="background:${PROGRAM_COLORS[ev.program]}"></span>${esc(PROG_LABEL[ev.program])} \u00b7 ${esc(time)}</div>`;
