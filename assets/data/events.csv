@@ -43,6 +43,7 @@ class,FALSE,11/12/26,3:00 PM,5:00 PM,,,,,,,HS
 class,,11/13/2026,4:00 PM,8:00 PM,Charter ROV 841,,,,,,Charter
 class,,11/15/2026,1:00 PM,5:00 PM,Charter ROV 841,,,,,,Charter
 class,FALSE,11/17/26,3:00 PM,6:00 PM,,,,,,,HS
+class,TRUE,11/19/2026,3:00 PM,5:00 PM,HS ROV - CANCELED,,,,,,HS
 class,,11/20/2026,4:00 PM,8:00 PM,Charter ROV 841,,,,,,Charter
 class,,11/22/2026,1:00 PM,5:00 PM,Charter ROV 841,,,,,,Charter
 noschool,,11/23/2026,,,Non-Instructional Days,,,,,,
@@ -61,7 +62,7 @@ class-extended,,12/11/2026,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,,12/11/2026,4:00 PM,8:00 PM,Charter ROV 841,,,,,,Charter
 class,,12/13/2026,1:00 PM,5:00 PM,Charter ROV 841,,,,,,Charter
 class,FALSE,12/15/26,3:00 PM,6:00 PM,,,,,,,HS
-class,TRUE,12/17/26,,,,,,,,,HS
+class,TRUE,12/17/26,3:00 PM,5:00 PM,HS ROV - CANCELED,,,,,,HS
 noschool,,12/18/2026,,,Non-Instructional Day,,,,,,
 noschool,,12/21/2026,,,Winter Break,,,,,,
 noschool,,12/22/2026,,,Winter Break,,,,,,
@@ -182,7 +183,7 @@ class,,5/28/2027,4:00 PM,8:00 PM,Charter ROV 841,,,,,,Charter
 class,,5/30/2027,1:00 PM,5:00 PM,Charter ROV 841,,,,,,Charter
 noschool,,5/31/2027,,,District Holiday,,,,,,
 class,FALSE,6/1/27,,,,,,,,,HS
-class,TRUE,6/3/27,,,,,,,,,HS
+class,TRUE,6/3/27,3:00 PM,5:00 PM,HS ROV - CANCELED,,,,,,HS
 noschool,,6/18/2027,,,District Holiday,,,,,,
 competition,,6/22/2027,,,Worlds,,,,,,HS
 competition,,6/23/2027,,,Worlds,,,,,,HS

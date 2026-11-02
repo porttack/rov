@@ -78,7 +78,11 @@ permalink: /year/
 
   /* Day colors are set inline per program (see PROGRAM_COLORS in the script);
      two or three programs on one day get a diagonal split. */
-  .month-cal td.ev-cancelled  { background: #e5e7eb; color: #aaa; }
+  /* Canceled (and nothing else that day): red hatch, struck-through number. */
+  .month-cal td.ev-cancelled  {
+    background: repeating-linear-gradient(135deg, #fecaca 0 3px, #fff 3px 6px);
+    color: #b91c1c; text-decoration: line-through;
+  }
   .month-cal td[data-date] { cursor: pointer; }
   /* Fade months that are over, and the days already gone in the current month. */
   .month-block.month-past { opacity: 0.42; }
@@ -140,6 +144,7 @@ permalink: /year/
     <label class="leg-item"><input type="checkbox" data-cat="scrimmage" checked><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage / competition</label>
     <label class="leg-item"><input type="checkbox" data-cat="outreach" checked><span class="leg-swatch" style="background:#f9a8d4"></span>Outreach</label>
     <label class="leg-item"><input type="checkbox" data-cat="meeting" checked><span class="leg-swatch" style="background:#f97316"></span>Meeting / mentors</label>
+    <label class="leg-item"><input type="checkbox" data-cat="cancelled" checked><span class="leg-swatch" style="background:repeating-linear-gradient(135deg,#fecaca 0 3px,#fff 3px 6px)"></span>Canceled</label>
     <label class="leg-item"><input type="checkbox" data-cat="holiday" checked><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</label>
     <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two or more on one day</span>
   </div>
@@ -159,6 +164,7 @@ const isBigEvent = e => e.type in EVENT_COLORS;
 const EVENT_GROUP = { scrimmage: 'scrimmage', competition: 'scrimmage', outreach: 'outreach', meeting: 'meeting', mentors: 'meeting' };
 const categoryOf = e => e.type === 'noschool' ? 'holiday' : (EVENT_GROUP[e.type] || e.program);
 const HIDDEN_KEY = 'rov-year-hidden';
+const isHiddenEvent = (e, hidden) => hidden.has(categoryOf(e)) || (e.cancelled && hidden.has('cancelled'));
 const HOLIDAY_COLOR = '#d1d5db';   // no-school days (gray)
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -192,15 +198,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Legend checkboxes: unchecked categories are left out of the colors and the hover cards.
       const hidden = new Set();
-      try { JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]').forEach(c => hidden.add(c)); } catch (e) {}
       const legend = document.getElementById('year-legend');
+      const validCats = new Set([...legend.querySelectorAll('input[data-cat]')].map(cb => cb.dataset.cat));
+      // A shared link's ?hide=charter,holiday wins over this browser's saved choices.
+      const hideParam = new URLSearchParams(location.search).get('hide');
+      if (hideParam !== null) {
+        hideParam.split(',').map(c => c.trim()).filter(c => validCats.has(c)).forEach(c => hidden.add(c));
+      } else {
+        try { JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]').forEach(c => { if (validCats.has(c)) hidden.add(c); }); } catch (e) {}
+      }
       legend.querySelectorAll('input[data-cat]').forEach(cb => { cb.checked = !hidden.has(cb.dataset.cat); });
 
       let evsByDate = {}, dayCls = {}, dayStyle = {};
       function resolveDays() {
         evsByDate = {}; dayCls = {}; dayStyle = {};
         Object.entries(allByDate).forEach(([iso, all]) => {
-          const evs = all.filter(e => !hidden.has(categoryOf(e)));
+          const evs = all.filter(e => !isHiddenEvent(e, hidden));
           if (evs.length) evsByDate[iso] = evs;
         });
 
@@ -288,6 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cb.dataset || !cb.dataset.cat) return;
         if (cb.checked) hidden.delete(cb.dataset.cat); else hidden.add(cb.dataset.cat);
         try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden])); } catch (err) {}
+        // Keep the address bar a shareable link of exactly what's showing.
+        const url = new URL(location.href);
+        if (hidden.size) url.searchParams.set('hide', [...hidden].join(',')); else url.searchParams.delete('hide');
+        history.replaceState(null, '', url);
         render();
       });
       render();
@@ -321,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
       h += '<div class="tip-ev">';
       if (ev.picture && /^https?:\/\//.test(ev.picture))
         h += `<img class="tip-photo" src="${esc(ev.picture)}" alt="" loading="lazy" onerror="this.remove()">`;
-      if (ev.cancelled) h += '<div style="color:#b91c1c;font-size:0.82em;font-weight:bold">CANCELLED</div>';
+      if (ev.cancelled) h += '<div style="color:#b91c1c;font-size:0.82em;font-weight:bold">CANCELED</div>';
       h += isBigEvent(ev)
         ? `<div class="tip-time"><span class="tip-prog" style="background:${EVENT_COLORS[ev.type]}"></span>${EVENT_LABELS[ev.type]} \u00b7 ${esc(time)}</div>`
         : ev.type === 'noschool'
