@@ -32,7 +32,7 @@ permalink: /year/
   }
 
   /* Month grid. Default: two columns filled top-to-bottom (Jul–Dec left,
-     Jan–Jun right). Over 1024px: 4 wide x 3 high, filled left-to-right.
+     Jan–Jun right). Over 1024px: 4 wide x 3 high, filled top-to-bottom (Jul–Sep, Oct–Dec, Jan–Mar, Apr–Jun).
      Phones: one column. */
   .year-columns {
     display: grid;
@@ -45,8 +45,8 @@ permalink: /year/
     #year-wrap { max-width: 1120px; }
     .year-columns {
       grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: none;
-      grid-auto-flow: row;
+      grid-template-rows: repeat(3, auto);
+      grid-auto-flow: column;
       gap: 1.2em 1.8em;
     }
   }
