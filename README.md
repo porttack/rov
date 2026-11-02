@@ -14,7 +14,7 @@ The site provides three views of the same event data:
 
 - **Calendar** — FullCalendar month/list view of all events
 - **Newsletter** — Upcoming events with full detail cards, a skim list, and a 3-month grid
-- **Year** — Compact two-column annual view (July–June school year), color-coded by event type
+- **Year** — Compact two-column annual view (September–May school year), color-coded by event type
 
 ---
 
@@ -48,7 +48,7 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 | `about.md` | About page: links to the three views and the source data |
 | `calendar.html` | FullCalendar 6 interactive calendar, reads Sheet CSV |
 | `newsletter.html` | Upcoming events detail + skim list + monthly grid |
-| `year.html` | Compact July–June annual calendar, color-coded cells |
+| `year.html` | Compact September–May annual calendar, color-coded cells |
 | `assets/js/rov-common.js` | Shared JS: CSV parser, column map, date/time helpers |
 | `appscript/RovSync.gs` | All Apps Script logic (paste into Google Sheet) |
 | `_includes/footer.html` | Site footer |
@@ -154,7 +154,7 @@ Dynamically generated from the CSV:
 
 ### year.html
 
-Compact two-column annual calendar for the current July–June school year. Left column: months 1–6; right column: months 7–12. Day cells are colorized by event type; days with no events are plain. The school year resets automatically each July.
+Compact two-column annual calendar for the current September–May school year. Left column: September–January; right column: February–May, plus any of June–August that have events. Day cells are colorized by event type; days with no events are plain. The school year resets automatically each August (August–December show the year starting that September).
 
 ---
 
