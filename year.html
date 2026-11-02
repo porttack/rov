@@ -26,6 +26,12 @@ permalink: /year/
   label.leg-item input:not(:checked) + .leg-swatch { background: #fff !important; border-color: currentColor; }
   label.leg-item input:focus-visible + .leg-swatch { outline: 2px solid #1a3a6b; outline-offset: 2px; }
   label.leg-item:has(input:not(:checked)) { color: #999; text-decoration: line-through; }
+  /* Layout option: not a filter, so unchecked isn't "off" -- keep it normal looking. */
+  label.leg-layout:has(input:not(:checked)) { color: inherit; text-decoration: none; }
+  label.leg-layout input:not(:checked) + .leg-swatch { background: #fff !important; border-color: rgba(0,0,0,0.35); }
+  /* Horizontal: months fill left-to-right, then down (default is down columns first). */
+  .year-columns.by-row { grid-auto-flow: row !important; grid-template-rows: none !important; }
+  @media (max-width: 560px) { .leg-layout { display: none; } }  /* single column: nothing to switch */
   .leg-swatch {
     width: 11px; height: 11px; border-radius: 2px;
     display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);
@@ -146,7 +152,8 @@ permalink: /year/
     <label class="leg-item"><input type="checkbox" data-cat="meeting" checked><span class="leg-swatch" style="background:#f97316"></span>Meeting / mentors</label>
     <label class="leg-item"><input type="checkbox" data-cat="cancelled" checked><span class="leg-swatch" style="background:repeating-linear-gradient(135deg,#fecaca 0 3px,#fff 3px 6px)"></span>Canceled</label>
     <label class="leg-item"><input type="checkbox" data-cat="holiday" checked><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</label>
-    <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two or more on one day</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%);width:11px;height:11px;border:1px solid rgba(0,0,0,0.08)"></span>Two or more on one day</span>
+    <label class="leg-item leg-layout"><input type="checkbox" data-opt="rows"><span class="leg-swatch" style="background:#fff"></span>Read across (horizontal)</label>
   </div>
 </div>
 
@@ -208,6 +215,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try { JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]').forEach(c => { if (validCats.has(c)) hidden.add(c); }); } catch (e) {}
       }
       legend.querySelectorAll('input[data-cat]').forEach(cb => { cb.checked = !hidden.has(cb.dataset.cat); });
+
+      // Layout option: ?rows=1 (or this browser's saved choice) fills months across rows.
+      const ROWS_KEY = 'rov-year-rows';
+      const rowsParam = new URLSearchParams(location.search).get('rows');
+      let byRow = rowsParam !== null ? rowsParam === '1' : false;
+      if (rowsParam === null) { try { byRow = localStorage.getItem(ROWS_KEY) === '1'; } catch (e) {} }
+      const rowsCb = legend.querySelector('input[data-opt="rows"]');
+      rowsCb.checked = byRow;
+      document.getElementById('year-months').classList.toggle('by-row', byRow);
 
       let evsByDate = {}, dayCls = {}, dayStyle = {};
       function resolveDays() {
@@ -298,12 +314,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       legend.addEventListener('change', e => {
         const cb = e.target;
-        if (!cb.dataset || !cb.dataset.cat) return;
-        if (cb.checked) hidden.delete(cb.dataset.cat); else hidden.add(cb.dataset.cat);
-        try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden])); } catch (err) {}
+        if (!cb.dataset) return;
+        if (cb.dataset.opt === 'rows') {
+          byRow = cb.checked;
+          document.getElementById('year-months').classList.toggle('by-row', byRow);
+          try { localStorage.setItem(ROWS_KEY, byRow ? '1' : '0'); } catch (err) {}
+        } else if (cb.dataset.cat) {
+          if (cb.checked) hidden.delete(cb.dataset.cat); else hidden.add(cb.dataset.cat);
+          try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden])); } catch (err) {}
+        } else return;
         // Keep the address bar a shareable link of exactly what's showing.
         const url = new URL(location.href);
         if (hidden.size) url.searchParams.set('hide', [...hidden].join(',')); else url.searchParams.delete('hide');
+        if (byRow) url.searchParams.set('rows', '1'); else url.searchParams.delete('rows');
         history.replaceState(null, '', url);
         render();
       });
