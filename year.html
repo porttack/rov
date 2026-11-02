@@ -63,7 +63,7 @@ permalink: /year/
 
 <div id="year-loading" style="text-align:center;padding:2em;color:#666;">Loading&hellip;</div>
 <div id="year-wrap" style="display:none">
-  <!-- 12-month school-year grid, September–August -->
+  <!-- 12-month grid, July–June -->
   <div class="year-columns">
     <div class="year-col" id="col-left"></div>
     <div class="year-col" id="col-right"></div>
@@ -156,17 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return html + '</tbody></table></div>';
       }
 
-      // School year starts in September. Aug–Dec shows the year starting this
-      // September; Jan–Jul shows the year that started last September.
-      const now        = new Date();
-      const startYear  = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+      // July–June year: July–Dec shows the year starting this July;
+      // Jan–Jun shows the year that started last July.
+      const now       = new Date();
+      const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
 
-      // Twelve months, September–August (June/July are there for Worlds).
-      // Sept–Feb on the left, March–August on the right.
+      // July–Dec on the left, Jan–June on the right.
       const leftCol  = document.getElementById('col-left');
       const rightCol = document.getElementById('col-right');
       for (let mo = 0; mo < 12; mo++) {
-        const ms = new Date(startYear, 8 + mo, 1);
+        const ms = new Date(startYear, 6 + mo, 1);
         (mo < 6 ? leftCol : rightCol).insertAdjacentHTML('beforeend', buildMonthHtml(ms));
       }
 

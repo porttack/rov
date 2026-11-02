@@ -12,7 +12,7 @@ Welcome to the SLV ROV website.
 
 - [Calendar](/calendar/) — Interactive month and list view of all events
 - [Newsletter](/newsletter/) — Upcoming events with full details
-- [Year](/year/) — Compact annual calendar (September–August, color-coded by program)
+- [Year](/year/) — Compact annual calendar (July–June, color-coded by program)
 
 ### Source data
 
