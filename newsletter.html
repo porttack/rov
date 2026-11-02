@@ -315,21 +315,11 @@ function renderNewsletter(allRows) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (CSV_URL === 'PASTE_YOUR_PUBLISHED_CSV_URL_HERE') {
-    document.getElementById('bulletin-loading').textContent =
-      'CSV_URL not configured — see assets/js/rov-common.js.';
-    return;
-  }
-
-  fetch(CSV_URL)
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
-    .then(text => {
-      const rows = parseCSV(text).slice(1).filter(r => r.length > COL.startTime);
-      renderNewsletter(rows);
-    })
+  loadRows()
+    .then(rows => renderNewsletter(rows))
     .catch(() => {
       document.getElementById('bulletin-loading').textContent =
-        'Could not load events. Make sure the sheet is published to the web.';
+        'Could not load events.';
     });
 });
 </script>

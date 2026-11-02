@@ -1,4 +1,10 @@
-// Shared utilities for SLV ROV website pages (calendar.html, newsletter.html)
+// Shared utilities for SLV ROV website pages (calendar, newsletter, year)
+
+// Event sources. Events come from the checked-in CSV below and, when USE_SHEET
+// is true, are merged with the published Google Sheet (rows are simply
+// concatenated, so don't list the same event in both).
+const LOCAL_CSV_URL = '/assets/data/events.csv';
+const USE_SHEET     = false;   // external spreadsheet disabled for now
 
 // Replace this with your sheet's "Publish to web" CSV URL.
 // In your spreadsheet: File → Share → Publish to web → CSV → copy URL.
@@ -21,6 +27,18 @@ const COL = {
   location:    9,
   program:     11,
 };
+
+// ── Loading ───────────────────────────────────────────────────────────────
+
+// Resolves to all event rows (header rows removed) from every enabled source.
+function loadRows() {
+  const get = url => fetch(url)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(text => parseCSV(text).slice(1).filter(r => r.length > COL.date));
+  const sources = [get(LOCAL_CSV_URL)];
+  if (USE_SHEET) sources.push(get(CSV_URL));
+  return Promise.all(sources).then(parts => [].concat(...parts));
+}
 
 // ── Parsing ───────────────────────────────────────────────────────────────
 

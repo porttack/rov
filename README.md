@@ -8,7 +8,7 @@ Website for **SLV ROV**, taught by Eric Brown at San Lorenzo Valley schools. Hos
 | Event spreadsheet | [Google Sheet](https://docs.google.com/spreadsheets/d/1SLUNLWSTkfGSynF8cHlQ_-DTQtXsS1t6KsRQ4U6am7k/edit?usp=sharing) (read-only) |
 | Google Calendar | [ROV Calendar](https://calendar.google.com/calendar/u/0/embed?src=c_148f1519506e3d16ae70587c9b7790fc5aa331e2cfd689a0e73fe707a72e0ecb@group.calendar.google.com&ctz=America/Los_Angeles) |
 
-Everything here is **driven by a single Google Sheet** that Eric manages. The website reads from that sheet automatically — no one needs to touch the website itself after initial setup.
+**Event data currently comes from [assets/data/events.csv](assets/data/events.csv)**, a checked-in file with the same columns as the sheet (A–L). Edit it and push to change the calendar. The Google Sheet is **disabled for now** (`USE_SHEET = false` in `assets/js/rov-common.js`); set it to `true` to merge the published sheet's rows with the local file (rows are concatenated, so don't list an event in both). Everything below about the sheet and the Calendar sync applies only when the sheet is in use.
 
 The site provides three views of the same event data:
 
@@ -49,6 +49,7 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 | `calendar.html` | FullCalendar 6 interactive calendar, reads Sheet CSV |
 | `newsletter.html` | Upcoming events detail + skim list + monthly grid |
 | `year.html` | Compact September–August annual calendar, cells colored by program |
+| `assets/data/events.csv` | Checked-in event data (columns A–L, same format as the sheet) |
 | `assets/js/rov-common.js` | Shared JS: CSV parser, column map, date/time helpers |
 | `appscript/RovSync.gs` | Apps Script logic (paste into Google Sheet) |
 | `appscript/RovApi.gs` | Optional token-protected web API so Claude can read/edit the sheet (setup steps in the file header) |

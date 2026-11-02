@@ -84,10 +84,8 @@ const PROGRAM_COLORS = { hs: '#93c5fd', charter: '#86efac', ms: '#fdba74' };
 const PROGRAMS = Object.keys(PROGRAM_COLORS);
 
 document.addEventListener('DOMContentLoaded', () => {
-  fetch(CSV_URL)
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
-    .then(text => {
-      const rows = parseCSV(text).slice(1).filter(r => r.length > COL.date);
+  loadRows()
+    .then(rows => {
 
       // Collect events by date
       const evsByDate = {};
