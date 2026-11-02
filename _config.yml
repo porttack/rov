@@ -13,10 +13,12 @@ header_pages:
   - calendar.html
   - newsletter.html
   - year.html
+  - about.md
 
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
+  - jekyll-redirect-from
 
 exclude:
   - appscript/

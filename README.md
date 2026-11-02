@@ -44,7 +44,8 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 
 | Path | Purpose |
 |---|---|
-| `index.md` | Homepage with links to the three views |
+| `index.md` | Redirects `/` to `/year/` (temporary; see comment in file to revert) |
+| `about.md` | About page: links to the three views and the source data |
 | `calendar.html` | FullCalendar 6 interactive calendar, reads Sheet CSV |
 | `newsletter.html` | Upcoming events detail + skim list + monthly grid |
 | `year.html` | Compact July–June annual calendar, color-coded cells |
