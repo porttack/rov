@@ -52,6 +52,7 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 | `assets/js/rov-common.js` | Shared JS: CSV parser, column map, date/time helpers |
 | `appscript/RovSync.gs` | All Apps Script logic (paste into Google Sheet) |
 | `_includes/footer.html` | Site footer |
+| `_includes/ms-rov.html` | Middle School ROV Team info shown above the Year grid (edit yearly) |
 | `_config.yml` | Jekyll config (title, theme, nav pages) |
 | `Gemfile` | GitHub Pages gem pin |
 

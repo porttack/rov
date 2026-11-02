@@ -5,7 +5,10 @@ permalink: /year/
 ---
 
 <style>
-  #year-wrap { max-width: 860px; margin: 0 auto; }
+  #year-wrap, .ms-rov { max-width: 860px; margin: 0 auto; }
+  .ms-rov { margin-bottom: 1.5em; font-size: 0.9em; }
+  .ms-rov h2 { font-size: 1.3em; margin-bottom: 0.4em; }
+  .ms-rov ul { margin-bottom: 0; }
 
   .year-legend {
     display: flex; flex-wrap: wrap; gap: 0.4em 1.2em;
@@ -64,6 +67,8 @@ permalink: /year/
   .month-cal td.ev-other        { background: #fee2e2; }
   .month-cal td.ev-cancelled    { background: #e5e7eb; color: #aaa; }
 </style>
+
+{% include ms-rov.html %}
 
 <div id="year-loading" style="text-align:center;padding:2em;color:#666;">Loading&hellip;</div>
 <div id="year-wrap" style="display:none">
