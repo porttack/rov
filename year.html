@@ -13,6 +13,10 @@ permalink: /year/
     font-size: 0.78em; font-family: Arial, sans-serif; color: #444;
   }
   .leg-item { display: flex; align-items: center; gap: 0.35em; }
+  label.leg-item { cursor: pointer; user-select: none; }
+  label.leg-item input { margin: 0 0.1em 0 0; cursor: pointer; }
+  label.leg-item:has(input:not(:checked)) { color: #999; text-decoration: line-through; }
+  label.leg-item:has(input:not(:checked)) .leg-swatch { opacity: 0.35; }
   .leg-swatch {
     width: 11px; height: 11px; border-radius: 2px;
     display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);
@@ -120,15 +124,15 @@ permalink: /year/
 <div id="year-wrap" style="display:none">
   <!-- 12-month grid, July–June -->
   <div class="year-columns" id="year-months"></div>
-  <div class="year-legend">
-    <span class="leg-item"><span class="leg-swatch" style="background:#93c5fd"></span>HS ROV</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#fdba74"></span>MS ROV</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage / competition</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#f9a8d4"></span>Outreach</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#f97316"></span>Meeting / mentors</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two programs</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</span>
+  <div class="year-legend" id="year-legend">
+    <label class="leg-item"><input type="checkbox" data-cat="hs" checked><span class="leg-swatch" style="background:#93c5fd"></span>HS ROV</label>
+    <label class="leg-item"><input type="checkbox" data-cat="charter" checked><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</label>
+    <label class="leg-item"><input type="checkbox" data-cat="ms" checked><span class="leg-swatch" style="background:#fdba74"></span>MS ROV</label>
+    <label class="leg-item"><input type="checkbox" data-cat="scrimmage" checked><span class="leg-swatch" style="background:#c4b5fd"></span>Scrimmage / competition</label>
+    <label class="leg-item"><input type="checkbox" data-cat="outreach" checked><span class="leg-swatch" style="background:#f9a8d4"></span>Outreach</label>
+    <label class="leg-item"><input type="checkbox" data-cat="meeting" checked><span class="leg-swatch" style="background:#f97316"></span>Meeting / mentors</label>
+    <label class="leg-item"><input type="checkbox" data-cat="holiday" checked><span class="leg-swatch" style="background:#d1d5db"></span>School holiday</label>
+    <span class="leg-item"><span class="leg-swatch" style="background:linear-gradient(135deg,#86efac 50%,#fdba74 50%)"></span>Two or more on one day</span>
   </div>
 </div>
 
@@ -142,14 +146,18 @@ const EVENT_COLORS = { scrimmage: '#c4b5fd', competition: '#c4b5fd', outreach: '
                        meeting: '#f97316', mentors: '#f97316' };   // parent/family meetings; mentors reuse the color
 const EVENT_LABELS = { scrimmage: 'Scrimmage', competition: 'Competition', outreach: 'Outreach', meeting: 'Meeting', mentors: 'Mentors' };
 const isBigEvent = e => e.type in EVENT_COLORS;
+// Legend checkbox category for an event: hs | charter | ms | scrimmage | outreach | meeting | holiday.
+const EVENT_GROUP = { scrimmage: 'scrimmage', competition: 'scrimmage', outreach: 'outreach', meeting: 'meeting', mentors: 'meeting' };
+const categoryOf = e => e.type === 'noschool' ? 'holiday' : (EVENT_GROUP[e.type] || e.program);
+const HIDDEN_KEY = 'rov-year-hidden';
 const HOLIDAY_COLOR = '#d1d5db';   // no-school days (gray)
 
 document.addEventListener('DOMContentLoaded', () => {
   loadRows()
     .then(rows => {
 
-      // Collect events by date
-      const evsByDate = {};
+      // Collect every event by date (unfiltered); render() applies the legend checkboxes.
+      const allByDate = {};
       rows.forEach(row => {
         const dateStr = fv(row, COL.date);
         if (!dateStr) return;
@@ -157,10 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
         const type = fv(row, COL.eventType).toLowerCase() || 'other';
         const cancelled = isCancelled(row);
-        if (!evsByDate[iso]) evsByDate[iso] = [];
+        if (!allByDate[iso]) allByDate[iso] = [];
         let program = fv(row, COL.program).toLowerCase();
         if (!PROGRAM_COLORS[program]) program = 'hs';   // blank/unknown = HS
-        evsByDate[iso].push({
+        allByDate[iso].push({
           type, cancelled, program,
           startTs: fv(row, COL.startTime), endTs: fv(row, COL.endTime),
           desc: getDesc(row), summary: fv(row, COL.summary), picture: fv(row, COL.picture),
@@ -168,35 +176,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
-      // Tooltip data, per date, in time order.
-      window._yearTipData = {};
-      Object.entries(evsByDate).forEach(([iso, evs]) => {
-        window._yearTipData[iso] = evs.slice().sort((a, b) => to24h(a.startTs).localeCompare(to24h(b.startTs)));
-      });
-
-      // Resolve each date to a fill: school holidays (noschool, red as on the
-      // rotary site) plus each program with a non-cancelled event; several
-      // colors split the cell diagonally. Cancelled-only days are gray.
-      const dayCls = {}, dayStyle = {};
-      Object.entries(evsByDate).forEach(([iso, evs]) => {
-        const active = evs.filter(e => !e.cancelled);
-        if (!active.length) { dayCls[iso] = 'ev-cancelled'; return; }
-        const real = active.filter(e => e.type !== 'noschool');
-        const colors = [];
-        if (real.length < active.length) colors.push(HOLIDAY_COLOR);
-        [...new Set(real.filter(isBigEvent).map(e => EVENT_COLORS[e.type]))].forEach(c => colors.push(c));
-        const regular = real.filter(e => !isBigEvent(e));
-        PROGRAMS.forEach(p => { if (regular.some(e => e.program === p)) colors.push(PROGRAM_COLORS[p]); });
-        const n = colors.length;
-        dayStyle[iso] = n === 1 ? colors[0]
-          : 'linear-gradient(135deg,' + colors.map((c, i) =>
-              `${c} ${(100 * i / n).toFixed(1)}% ${(100 * (i + 1) / n).toFixed(1)}%`).join(',') + ')';
-        dayCls[iso] = '';
-      });
-
-      if (!Object.keys(dayCls).length) {
+      if (!Object.keys(allByDate).length) {
         document.getElementById('year-loading').textContent = 'No events found.';
         return;
+      }
+
+      // Legend checkboxes: unchecked categories are left out of the colors and the hover cards.
+      const hidden = new Set();
+      try { JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]').forEach(c => hidden.add(c)); } catch (e) {}
+      const legend = document.getElementById('year-legend');
+      legend.querySelectorAll('input[data-cat]').forEach(cb => { cb.checked = !hidden.has(cb.dataset.cat); });
+
+      let evsByDate = {}, dayCls = {}, dayStyle = {};
+      function resolveDays() {
+        evsByDate = {}; dayCls = {}; dayStyle = {};
+        Object.entries(allByDate).forEach(([iso, all]) => {
+          const evs = all.filter(e => !hidden.has(categoryOf(e)));
+          if (evs.length) evsByDate[iso] = evs;
+        });
+
+        // Tooltip data, per date, in time order.
+        window._yearTipData = {};
+        Object.entries(evsByDate).forEach(([iso, evs]) => {
+          window._yearTipData[iso] = evs.slice().sort((a, b) => to24h(a.startTs).localeCompare(to24h(b.startTs)));
+        });
+
+        // Resolve each date to a fill: school holidays (gray) plus each
+        // category with a non-cancelled event; several colors split the cell
+        // diagonally. Cancelled-only days are light gray.
+        Object.entries(evsByDate).forEach(([iso, evs]) => {
+          const active = evs.filter(e => !e.cancelled);
+          if (!active.length) { dayCls[iso] = 'ev-cancelled'; return; }
+          const real = active.filter(e => e.type !== 'noschool');
+          const colors = [];
+          if (real.length < active.length) colors.push(HOLIDAY_COLOR);
+          [...new Set(real.filter(isBigEvent).map(e => EVENT_COLORS[e.type]))].forEach(c => colors.push(c));
+          const regular = real.filter(e => !isBigEvent(e));
+          PROGRAMS.forEach(p => { if (regular.some(e => e.program === p)) colors.push(PROGRAM_COLORS[p]); });
+          const n = colors.length;
+          dayStyle[iso] = n === 1 ? colors[0]
+            : 'linear-gradient(135deg,' + colors.map((c, i) =>
+                `${c} ${(100 * i / n).toFixed(1)}% ${(100 * (i + 1) / n).toFixed(1)}%`).join(',') + ')';
+          dayCls[iso] = '';
+        });
       }
       // Build HTML for a single month grid
       const t = new Date();
@@ -244,9 +266,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // All 12 months go in one grid; CSS lays it out (see .year-columns).
       const grid = document.getElementById('year-months');
-      for (let mo = 0; mo < 12; mo++) {
-        grid.insertAdjacentHTML('beforeend', buildMonthHtml(new Date(startYear, 6 + mo, 1)));
+      function render() {
+        resolveDays();
+        grid.innerHTML = '';
+        for (let mo = 0; mo < 12; mo++) {
+          grid.insertAdjacentHTML('beforeend', buildMonthHtml(new Date(startYear, 6 + mo, 1)));
+        }
+        if (window._yearTipHide) window._yearTipHide();
       }
+      legend.addEventListener('change', e => {
+        const cb = e.target;
+        if (!cb.dataset || !cb.dataset.cat) return;
+        if (cb.checked) hidden.delete(cb.dataset.cat); else hidden.add(cb.dataset.cat);
+        try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden])); } catch (err) {}
+        render();
+      });
+      render();
 
       document.getElementById('year-loading').style.display = 'none';
       document.getElementById('year-wrap').style.display    = 'block';
@@ -313,7 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
     tip.style.display = 'block';
     return true;
   }
-  function hideTip() { tip.style.display = 'none'; tip.classList.remove('pinned'); pinned = null; }
+  function hideTip() { tip.style.display = 'none'; tip.classList.remove('pinned'); pinned = null; cur = null; }
+  window._yearTipHide = hideTip;
 
   let cur = null, pinned = null;
   // iOS treats a tap as "reveal hover" if mouseover changes the page, which
