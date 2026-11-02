@@ -5,14 +5,11 @@ permalink: /year/
 ---
 
 <style>
-  #year-wrap, .ms-rov { max-width: 860px; margin: 0 auto; }
-  .ms-rov { margin-bottom: 1.5em; font-size: 0.9em; }
-  .ms-rov h2 { font-size: 1.3em; margin-bottom: 0.4em; }
-  .ms-rov ul { margin-bottom: 0; }
+  #year-wrap { max-width: 860px; margin: 0 auto; }
 
   .year-legend {
     display: flex; flex-wrap: wrap; gap: 0.4em 1.2em;
-    margin-bottom: 1.2em;
+    margin: 1.4em 0 0;
     font-size: 0.78em; font-family: Arial, sans-serif; color: #444;
   }
   .leg-item { display: flex; align-items: center; gap: 0.35em; }
@@ -54,51 +51,37 @@ permalink: /year/
   }
   .month-cal td:empty { background: none; }
 
-  /* Event type cell colors */
-  .month-cal td.ev-class          { background: #c7d7fb; }
-  .month-cal td.ev-class-extended { background: #bae6fd; }
-  .month-cal td.ev-service      { background: #fed7aa; }
-  .month-cal td.ev-competition  { background: #bbf7d0; }
-  .month-cal td.ev-workday      { background: #fef9c3; }
-  .month-cal td.ev-fieldtrip    { background: #e9d5ff; }
-  .month-cal td.ev-mentors      { background: #fce7f3; }
-  .month-cal td.ev-presentation { background: #ccfbf1; }
-  .month-cal td.ev-noschool     { background: #f3f4f6; color: #666; }
-  .month-cal td.ev-other        { background: #fee2e2; }
-  .month-cal td.ev-cancelled    { background: #e5e7eb; color: #aaa; }
+  /* Day colors are set inline per program (see PROGRAM_COLORS in the script);
+     two or three programs on one day get a diagonal split. */
+  .month-cal td.ev-noschool   { background: #f3f4f6; color: #666; }
+  .month-cal td.ev-cancelled  { background: #e5e7eb; color: #aaa; }
+  .month-cal td.ev-competition { font-weight: bold; box-shadow: inset 0 0 0 2px #166534; }
+  .leg-comp { background: #fff; box-shadow: inset 0 0 0 2px #166534; }
+  .month-cal td.today { outline: 2px solid #dc2626; outline-offset: -1px; font-weight: bold; }
+  .month-cal td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 </style>
-
-{% include ms-rov.html %}
 
 <div id="year-loading" style="text-align:center;padding:2em;color:#666;">Loading&hellip;</div>
 <div id="year-wrap" style="display:none">
-  <div class="year-legend">
-    <span class="leg-item"><span class="leg-swatch" style="background:#c7d7fb"></span>Class</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#bae6fd"></span>Class (extended)</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#fed7aa"></span>Service</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#bbf7d0"></span>Competition</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#fef9c3"></span>Workday</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#e9d5ff"></span>Field Trip</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#fce7f3"></span>Mentors</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#ccfbf1"></span>Presentation</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#f3f4f6"></span>No School</span>
-    <span class="leg-item"><span class="leg-swatch" style="background:#fee2e2"></span>Other</span>
-  </div>
-  <!-- September–May school-year grid; Jun–Aug are appended only if they have events -->
+  <!-- 12-month school-year grid, September–August -->
   <div class="year-columns">
     <div class="year-col" id="col-left"></div>
     <div class="year-col" id="col-right"></div>
+  </div>
+  <div class="year-legend">
+    <span class="leg-item"><span class="leg-swatch" style="background:#93c5fd"></span>HS ROV</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#86efac"></span>Charter ROV</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#fdba74"></span>MS ROV</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:#f3f4f6"></span>No school</span>
+    <span class="leg-item"><span class="leg-swatch leg-comp"></span>Competition</span>
   </div>
 </div>
 
 <script src="{{ '/assets/js/rov-common.js' | relative_url }}"></script>
 <script>
-// When multiple event types fall on the same day, show the highest-priority one.
-const TYPE_PRIORITY = {
-  'competition': 0, 'fieldtrip': 1, 'service': 2,
-  'mentors': 3, 'presentation': 4, 'workday': 5,
-  'class-extended': 6, 'class': 7, 'other': 8, 'noschool': 9,
-};
+// Program fill colors; a day with several programs is split in this order.
+const PROGRAM_COLORS = { hs: '#93c5fd', charter: '#86efac', ms: '#fdba74' };
+const PROGRAMS = Object.keys(PROGRAM_COLORS);
 
 document.addEventListener('DOMContentLoaded', () => {
   fetch(CSV_URL)
@@ -116,20 +99,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const type = fv(row, COL.eventType).toLowerCase() || 'other';
         const cancelled = isCancelled(row);
         if (!evsByDate[iso]) evsByDate[iso] = [];
-        evsByDate[iso].push({ type, cancelled });
+        let program = fv(row, COL.program).toLowerCase();
+        if (!PROGRAM_COLORS[program]) program = 'hs';   // blank/unknown = HS
+        evsByDate[iso].push({ type, cancelled, program });
       });
 
-      // Resolve each date to a single CSS class (highest-priority non-cancelled type)
-      const dayCls = {};
+      // Resolve each date to { cls, style }: the set of programs with a
+      // non-cancelled event (noschool and cancelled-only days are gray).
+      const dayCls = {}, dayStyle = {};
       Object.entries(evsByDate).forEach(([iso, evs]) => {
         const active = evs.filter(e => !e.cancelled);
-        if (active.length) {
-          const best = active.sort((a, b) =>
-            (TYPE_PRIORITY[a.type] ?? 99) - (TYPE_PRIORITY[b.type] ?? 99))[0];
-          dayCls[iso] = 'ev-' + best.type;
-        } else {
-          dayCls[iso] = 'ev-cancelled';
-        }
+        if (!active.length) { dayCls[iso] = 'ev-cancelled'; return; }
+        const real = active.filter(e => e.type !== 'noschool');
+        if (!real.length) { dayCls[iso] = 'ev-noschool'; return; }
+        const progs = PROGRAMS.filter(p => real.some(e => e.program === p));
+        const n = progs.length;
+        dayStyle[iso] = n === 1 ? progs[0] && PROGRAM_COLORS[progs[0]]
+          : 'linear-gradient(135deg,' + progs.map((p, i) =>
+              `${PROGRAM_COLORS[p]} ${(100 * i / n).toFixed(1)}% ${(100 * (i + 1) / n).toFixed(1)}%`).join(',') + ')';
+        dayCls[iso] = real.some(e => e.type === 'competition') ? 'ev-competition' : '';
       });
 
       if (!Object.keys(dayCls).length) {
@@ -137,6 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       // Build HTML for a single month grid
+      const t = new Date();
+      const todayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
       const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       function buildMonthHtml(ms) {
         const yr       = ms.getFullYear();
@@ -158,8 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
               html += '<td></td>';
             } else {
               const key = `${yr}-${String(moIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-              const cls = dayCls[key];
-              html += cls ? `<td class="${cls}">${dayNum}</td>` : `<td>${dayNum}</td>`;
+              const cls = [dayCls[key], key === todayKey ? 'today' : ''].filter(Boolean).join(' ');
+              const bg  = dayStyle[key] ? ` style="background:${dayStyle[key]}"` : '';
+              html += `<td${cls ? ` class="${cls}"` : ''}${bg}>${dayNum}</td>`;
             }
           }
           html += '</tr>';
@@ -167,25 +158,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return html + '</tbody></table></div>';
       }
 
-      // September–May school year. Aug–Dec shows the year starting this
+      // School year starts in September. Aug–Dec shows the year starting this
       // September; Jan–Jul shows the year that started last September.
       const now        = new Date();
       const startYear  = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
 
-      // Sept..May, plus any of Jun/Jul/Aug that have events so nothing disappears.
-      const months = [];
-      for (let mo = 0; mo < 9; mo++) months.push(new Date(startYear, 8 + mo, 1));
-      for (let mo = 9; mo < 12; mo++) {
-        const ms = new Date(startYear, 8 + mo, 1);
-        const prefix = `${ms.getFullYear()}-${String(ms.getMonth() + 1).padStart(2, '0')}-`;
-        if (Object.keys(dayCls).some(k => k.startsWith(prefix))) months.push(ms);
-      }
-
-      // Sept–Jan on the left, Feb–May (and any summer months) on the right.
+      // Twelve months, September–August (June/July are there for Worlds).
+      // Sept–Feb on the left, March–August on the right.
       const leftCol  = document.getElementById('col-left');
       const rightCol = document.getElementById('col-right');
-      months.forEach((ms, i) =>
-        (i < 5 ? leftCol : rightCol).insertAdjacentHTML('beforeend', buildMonthHtml(ms)));
+      for (let mo = 0; mo < 12; mo++) {
+        const ms = new Date(startYear, 8 + mo, 1);
+        (mo < 6 ? leftCol : rightCol).insertAdjacentHTML('beforeend', buildMonthHtml(ms));
+      }
 
       document.getElementById('year-loading').style.display = 'none';
       document.getElementById('year-wrap').style.display    = 'block';

@@ -6,7 +6,7 @@
 // 3. Run "setupSheet" from the function dropdown and authorize when prompted
 // 4. Reload the spreadsheet — you will see the ROV menu
 //
-// COLUMNS (A–K)
+// COLUMNS (A–L)
 //   A: Event type  (class | service | competition | workday | fieldtrip | mentors | presentation | other)
 //   B: Cancelled   (checkbox — checked = cancelled)
 //   C: Date
@@ -18,6 +18,7 @@
 //   I: Comments
 //   J: Location    (optional — used in Google Calendar sync)
 //   K: Calendar Event ID  ← auto-managed, do not edit
+//   L: Program     (HS | Charter | MS — blank = HS; sets the day color on the Year view)
 
 const SHEET_NAME  = 'Calendar';  // Change to match your tab name exactly
 const CALENDAR_ID = 'c_148f1519506e3d16ae70587c9b7790fc5aa331e2cfd689a0e73fe707a72e0ecb@group.calendar.google.com'; // 'primary' = your main Google Calendar
@@ -35,10 +36,13 @@ const C_PIC   = 8;
 const C_COMM  = 9;
 const C_LOC   = 10;
 const C_CALID = 11;
+const C_PROG  = 12;
+
+const PROGRAMS = ['HS', 'Charter', 'MS'];
 
 const HEADERS = [
   'Event Type', 'Cancelled', 'Date', 'Start Time', 'End Time',
-  'Description', 'Summary', 'Picture URL', 'Comments', 'Location', 'Calendar Event ID'
+  'Description', 'Summary', 'Picture URL', 'Comments', 'Location', 'Calendar Event ID', 'Program'
 ];
 
 const EVENT_TYPES = ['class', 'class-extended', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'noschool', 'other'];
@@ -124,6 +128,13 @@ function addValidation_(sheet) {
   sheet.getRange(2, C_TYPE, numRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireValueInList(EVENT_TYPES, true)
+      .setAllowInvalid(false)
+      .build()
+  );
+
+  sheet.getRange(2, C_PROG, numRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(PROGRAMS, true)
       .setAllowInvalid(false)
       .build()
   );

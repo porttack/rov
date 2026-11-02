@@ -14,7 +14,7 @@ The site provides three views of the same event data:
 
 - **Calendar** — FullCalendar month/list view of all events
 - **Newsletter** — Upcoming events with full detail cards, a skim list, and a 3-month grid
-- **Year** — Compact two-column annual view (September–May school year), color-coded by event type
+- **Year** — Compact two-column annual view (September–August school year), color-coded by program
 
 ---
 
@@ -48,7 +48,7 @@ The Google Calendar is kept in sync manually by running **ROV → Sync to Google
 | `about.md` | About page: links to the three views and the source data |
 | `calendar.html` | FullCalendar 6 interactive calendar, reads Sheet CSV |
 | `newsletter.html` | Upcoming events detail + skim list + monthly grid |
-| `year.html` | Compact September–May annual calendar, color-coded cells |
+| `year.html` | Compact September–August annual calendar, cells colored by program |
 | `assets/js/rov-common.js` | Shared JS: CSV parser, column map, date/time helpers |
 | `appscript/RovSync.gs` | All Apps Script logic (paste into Google Sheet) |
 | `_includes/footer.html` | Site footer |
@@ -102,7 +102,7 @@ Enter events in the sheet, then run **ROV → Sync to Google Calendar** to push 
 
 ---
 
-## Column schema (Google Sheet, columns A–K)
+## Column schema (Google Sheet, columns A–L)
 
 | Col | Header | Notes |
 |---|---|---|
@@ -117,6 +117,7 @@ Enter events in the sheet, then run **ROV → Sync to Google Calendar** to push 
 | I | Comments | Internal notes — shown on website but not synced to calendar |
 | J | Location | Optional — used as the Google Calendar event location |
 | K | Calendar Event ID | Auto-managed by script — **do not edit** |
+| L | Program | Dropdown: `HS`, `Charter`, `MS`. Blank = HS. Sets the day color on the Year view |
 
 ---
 
@@ -135,7 +136,7 @@ Enter events in the sheet, then run **ROV → Sync to Google Calendar** to push 
 | `noschool` | light gray | — | No-school days (website only, not synced to calendar) |
 | `other` | light red | red | Anything else |
 
-When multiple events fall on the same day in the **Year** view, the highest-priority type wins: competition → field trip → service → mentors → presentation → workday → class-extended → class → other → no school.
+In the **Year** view, color comes from the Program column rather than the event type. Event type only matters for `noschool` (gray) and `competition` (outline).
 
 ---
 
@@ -155,7 +156,7 @@ Dynamically generated from the CSV:
 
 ### year.html
 
-Compact two-column annual calendar for the current September–May school year. Left column: September–January; right column: February–May, plus any of June–August that have events. Day cells are colorized by event type; days with no events are plain. The school year resets automatically each August (August–December show the year starting that September).
+Compact two-column annual calendar showing all 12 months of the school year, September–August (June is included for Worlds). Left column: September–February; right column: March–August. Days are filled by **program** (HS blue, Charter green, MS orange); a day with more than one program is split diagonally. No-school days are gray, cancelled-only days are dark gray, competition days get a bold green outline, and today is ringed in red. The only text is a legend below the grid. The school year resets automatically each August (August–December show the year starting that September). MS team details live in `_includes/ms-rov.html` and are shown on the About page.
 
 ---
 

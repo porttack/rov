@@ -7,6 +7,7 @@ const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT212z-hIqUM_Qf
 // Column indices (0-based), matching spreadsheet column order:
 // A: Event type | B: Cancelled | C: Date | D: Start Time | E: End Time
 // F: Description | G: Summary | H: Picture | I: Comments | J: Location
+// K: Calendar Event ID (script-managed) | L: Program (HS | Charter | MS; blank = HS)
 const COL = {
   eventType:   0,
   cancelled:   1,
@@ -18,6 +19,7 @@ const COL = {
   picture:     7,
   comments:    8,
   location:    9,
+  program:     11,
 };
 
 // ── Parsing ───────────────────────────────────────────────────────────────

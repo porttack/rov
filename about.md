@@ -6,11 +6,13 @@ permalink: /about/
 
 Welcome to the SLV ROV website.
 
+{% include ms-rov.html %}
+
 ### This site
 
 - [Calendar](/calendar/) — Interactive month and list view of all events
 - [Newsletter](/newsletter/) — Upcoming events with full details
-- [Year](/year/) — Compact annual calendar (September–May)
+- [Year](/year/) — Compact annual calendar (September–August, color-coded by program)
 
 ### Source data
 
