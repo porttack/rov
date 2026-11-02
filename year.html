@@ -14,9 +14,18 @@ permalink: /year/
   }
   .leg-item { display: flex; align-items: center; gap: 0.35em; }
   label.leg-item { cursor: pointer; user-select: none; }
-  label.leg-item input { margin: 0 0.1em 0 0; cursor: pointer; }
+  /* The colored swatch is the checkbox: filled with a check when on, an empty
+     outlined box when off. The real input stays (hidden) for keyboard/screen readers. */
+  label.leg-item input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  label.leg-item .leg-swatch {
+    width: 16px; height: 16px; border-radius: 3px; border: 2px solid rgba(0,0,0,0.25);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; line-height: 1; font-weight: bold; color: rgba(0,0,0,0.65);
+  }
+  label.leg-item input:checked + .leg-swatch::after { content: '\2713'; }
+  label.leg-item input:not(:checked) + .leg-swatch { background: #fff !important; border-color: currentColor; }
+  label.leg-item input:focus-visible + .leg-swatch { outline: 2px solid #1a3a6b; outline-offset: 2px; }
   label.leg-item:has(input:not(:checked)) { color: #999; text-decoration: line-through; }
-  label.leg-item:has(input:not(:checked)) .leg-swatch { opacity: 0.35; }
   .leg-swatch {
     width: 11px; height: 11px; border-radius: 2px;
     display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);
