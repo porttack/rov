@@ -57,8 +57,54 @@ permalink: /year/
   .month-cal td.ev-cancelled  { background: #e5e7eb; color: #aaa; }
   .month-cal td.ev-competition { font-weight: bold; box-shadow: inset 0 0 0 2px #166534; }
   .leg-comp { background: #fff; box-shadow: inset 0 0 0 2px #166534; }
+  .month-cal td[data-date] { cursor: pointer; }
+  /* Fade months that are over, and the days already gone in the current month. */
+  .month-block.month-past { opacity: 0.42; }
+  .month-cal td.day-past  { opacity: 0.48; }
+  @media screen and (max-width: 560px) {
+    .month-block.month-past { display: none; }  /* phones: drop past months; print keeps all */
+  }
   .month-cal td.today { outline: 2px solid #dc2626; outline-offset: -1px; font-weight: bold; }
   .month-cal td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  #year-tip {
+    display: none; position: fixed; z-index: 9999;
+    background: #fff; border: 1px solid #c5cae9; border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    padding: 0.55em 0.85em; max-width: 280px; min-width: 150px;
+    font-family: Arial, sans-serif; font-size: 0.8em; line-height: 1.5;
+    pointer-events: none; color: #222;
+  }
+  #year-tip.pinned { pointer-events: auto; }
+  #year-tip .tip-date    { font-weight: bold; color: #1a3a6b; margin-bottom: 0.2em; }
+  #year-tip .tip-prog    { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 0.35em; }
+  #year-tip .tip-time    { font-weight: bold; color: #1a3a6b; }
+  #year-tip .tip-type    { font-style: italic; color: #444; }
+  #year-tip .tip-field   { margin-top: 0.15em; }
+  #year-tip .tip-text    { color: #555; margin-top: 0.3em; font-size: 0.95em; white-space: pre-line; }
+  #year-tip .tip-photo   { float: right; width: 56px; height: 56px; object-fit: cover; border-radius: 6px; margin: 0 0 0.3em 0.5em; }
+  #year-tip .tip-ev::after { content: ''; display: table; clear: both; }
+  #year-tip hr           { border: none; border-top: 1px solid #e0e0e0; margin: 0.4em 0; }
+  #year-tip .tip-close {
+    display: none; position: absolute; top: 0.3em; right: 0.4em;
+    width: 28px; height: 28px; line-height: 26px; text-align: center;
+    background: #eef1f6; border: none; border-radius: 50%;
+    font-size: 1.15em; color: #555; cursor: pointer; padding: 0;
+  }
+  /* Phones: a pinned card docks as a bottom sheet, away from the tiny day cells. */
+  @media screen and (max-width: 560px) {
+    #year-tip.pinned {
+      position: fixed !important;
+      left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+      width: auto; max-width: none; min-width: 0; max-height: 60vh; overflow-y: auto;
+      border-radius: 14px 14px 0 0;
+      padding: 0.9em 1em calc(0.9em + env(safe-area-inset-bottom, 0px));
+      font-size: 1em; box-shadow: 0 -4px 20px rgba(0,0,0,0.28);
+    }
+    #year-tip.pinned .tip-close { display: block; }
+    #year-tip.pinned .tip-body  { padding-right: 2em; }
+  }
+  @media print { #year-tip { display: none !important; } }
 </style>
 
 <div id="year-loading" style="text-align:center;padding:2em;color:#666;">Loading&hellip;</div>
@@ -99,7 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!evsByDate[iso]) evsByDate[iso] = [];
         let program = fv(row, COL.program).toLowerCase();
         if (!PROGRAM_COLORS[program]) program = 'hs';   // blank/unknown = HS
-        evsByDate[iso].push({ type, cancelled, program });
+        evsByDate[iso].push({
+          type, cancelled, program,
+          startTs: fv(row, COL.startTime), endTs: fv(row, COL.endTime),
+          desc: getDesc(row), summary: fv(row, COL.summary), picture: fv(row, COL.picture),
+          comments: fv(row, COL.comments), location: fv(row, COL.location),
+        });
+      });
+
+      // Tooltip data, per date, in time order.
+      window._yearTipData = {};
+      Object.entries(evsByDate).forEach(([iso, evs]) => {
+        window._yearTipData[iso] = evs.slice().sort((a, b) => to24h(a.startTs).localeCompare(to24h(b.startTs)));
       });
 
       // Resolve each date to { cls, style }: the set of programs with a
@@ -132,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const daysInMo = new Date(yr, moIdx + 1, 0).getDate();
         const moLabel  = ms.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-        let html = `<div class="month-block">
+        const isPastMonth    = yr < t.getFullYear() || (yr === t.getFullYear() && moIdx < t.getMonth());
+        const isCurrentMonth = yr === t.getFullYear() && moIdx === t.getMonth();
+
+        let html = `<div class="month-block${isPastMonth ? ' month-past' : ''}">
 <div class="month-title">${esc(moLabel)}</div>
 <table class="month-cal" role="presentation">
 <thead><tr>${DOW.map(d => `<th>${d}</th>`).join('')}</tr></thead>
@@ -146,9 +206,11 @@ document.addEventListener('DOMContentLoaded', () => {
               html += '<td></td>';
             } else {
               const key = `${yr}-${String(moIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-              const cls = [dayCls[key], key === todayKey ? 'today' : ''].filter(Boolean).join(' ');
+              const cls = [dayCls[key], key === todayKey ? 'today' : '',
+                           isCurrentMonth && dayNum < t.getDate() ? 'day-past' : ''].filter(Boolean).join(' ');
+              const dd  = evsByDate[key] ? ` data-date="${key}"` : '';
               const bg  = dayStyle[key] ? ` style="background:${dayStyle[key]}"` : '';
-              html += `<td${cls ? ` class="${cls}"` : ''}${bg}>${dayNum}</td>`;
+              html += `<td${cls ? ` class="${cls}"` : ''}${dd}${bg}>${dayNum}</td>`;
             }
           }
           html += '</tr>';
@@ -176,5 +238,92 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('year-loading').textContent =
         'Could not load calendar data.';
     });
+});
+
+// ── Hover / tap tooltip (ported from the rotary site) ─────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const tip = document.createElement('div');
+  tip.id = 'year-tip';
+  tip.innerHTML = '<button type="button" class="tip-close" aria-label="Close">&times;</button><div class="tip-body"></div>';
+  document.body.appendChild(tip);
+  const tipBody = tip.querySelector('.tip-body');
+  const PROG_LABEL = { hs: 'HS ROV', charter: 'Charter ROV', ms: 'MS ROV' };
+
+  function tipHtml(iso, evs) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dateLbl = new Date(y, m - 1, d).toLocaleDateString('en-US',
+      { weekday: 'long', month: 'long', day: 'numeric' });
+    return `<div class="tip-date">${esc(dateLbl)}</div>` + evs.map((ev, i) => {
+      const a = abbrevTime(ev.startTs), b = abbrevTime(ev.endTs);
+      const time = a ? (b ? `${a}\u2013${b}` : a) : 'All day';
+      let h = i ? '<hr>' : '';
+      h += '<div class="tip-ev">';
+      if (ev.picture && /^https?:\/\//.test(ev.picture))
+        h += `<img class="tip-photo" src="${esc(ev.picture)}" alt="" loading="lazy" onerror="this.remove()">`;
+      if (ev.cancelled) h += '<div style="color:#b91c1c;font-size:0.82em;font-weight:bold">CANCELLED</div>';
+      h += `<div class="tip-time"><span class="tip-prog" style="background:${PROGRAM_COLORS[ev.program]}"></span>${esc(PROG_LABEL[ev.program])} \u00b7 ${esc(time)}</div>`;
+      h += `<div class="tip-field">${esc(ev.desc)}</div>`;
+      if (ev.type && ev.type !== ev.desc.toLowerCase()) h += `<div class="tip-type">${esc(ev.type)}</div>`;
+      if (ev.location) h += `<div class="tip-field">${mapLink(ev.location)}</div>`;
+      if (ev.summary)  h += `<div class="tip-text">${esc(ev.summary)}</div>`;
+      if (ev.comments) h += `<div class="tip-text">${esc(ev.comments)}</div>`;
+      return h + '</div>';
+    }).join('');
+  }
+
+  function placeAtCursor(e) {
+    const pad = 14, tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    tip.style.left = (e.clientX + pad + tw < vw) ? (e.clientX + pad) + 'px' : Math.max(4, e.clientX - pad - tw) + 'px';
+    tip.style.top  = (e.clientY + pad + th < vh) ? (e.clientY + pad) + 'px' : Math.max(4, e.clientY - pad - th) + 'px';
+  }
+  function placeNearEl(el) {
+    const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight, pad = 8;
+    let top = r.bottom + pad;
+    if (top + th > vh - 4) top = Math.max(4, r.top - th - pad);
+    tip.style.top  = top + 'px';
+    tip.style.left = Math.max(4, Math.min(vw - tw - 4, r.left + r.width / 2 - tw / 2)) + 'px';
+  }
+  function showForCell(td) {
+    const evs = window._yearTipData && window._yearTipData[td.dataset.date];
+    if (!evs || !evs.length) return false;
+    tipBody.innerHTML = tipHtml(td.dataset.date, evs);
+    tip.style.display = 'block';
+    return true;
+  }
+  function hideTip() { tip.style.display = 'none'; tip.classList.remove('pinned'); pinned = null; }
+
+  let cur = null, pinned = null;
+  // iOS treats a tap as "reveal hover" if mouseover changes the page, which
+  // swallows the click; touch devices therefore only get tap-to-pin.
+  const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+
+  document.addEventListener('mouseover', e => {
+    if (IS_TOUCH || pinned) return;
+    const td = e.target.closest && e.target.closest('td[data-date]');
+    if (!td || td === cur) return;
+    cur = td;
+    if (showForCell(td)) placeAtCursor(e); else tip.style.display = 'none';
+  });
+  document.addEventListener('mousemove', e => {
+    if (IS_TOUCH || pinned || tip.style.display === 'none') return;
+    placeAtCursor(e);
+  });
+  document.addEventListener('mouseout', e => {
+    if (IS_TOUCH || pinned) return;
+    if (e.target === cur) { tip.style.display = 'none'; cur = null; }
+  });
+  document.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('.tip-close')) { hideTip(); e.stopPropagation(); return; }
+    const td = e.target.closest && e.target.closest('td[data-date]');
+    if (td) {
+      if (td === pinned) hideTip();
+      else if (showForCell(td)) { pinned = td; cur = null; placeNearEl(td); tip.classList.add('pinned'); }
+      e.stopPropagation();
+    } else if (e.target.closest && e.target.closest('#year-tip')) {
+      return;   // taps inside the pinned card (e.g. the map link) are not "outside"
+    } else if (pinned) hideTip();
+  });
 });
 </script>
