@@ -45,7 +45,7 @@ const HEADERS = [
   'Description', 'Summary', 'Picture URL', 'Comments', 'Location', 'Calendar Event ID', 'Program'
 ];
 
-const EVENT_TYPES = ['class', 'class-extended', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'scrimmage', 'outreach', 'noschool', 'other'];
+const EVENT_TYPES = ['class', 'class-extended', 'service', 'competition', 'workday', 'fieldtrip', 'mentors', 'presentation', 'scrimmage', 'outreach', 'meeting', 'noschool', 'other'];
 
 const TYPE_COLORS = {
   'class':          '#c7d7fb',  // light blue
@@ -58,6 +58,7 @@ const TYPE_COLORS = {
   'presentation': '#ccfbf1',  // light teal
   'scrimmage':    '#ddd6fe',  // light violet
   'outreach':     '#fbcfe8',  // light pink
+  'meeting':      '#99f6e4',  // light teal-green
   'noschool':     '#f3f4f6',  // light gray
   'other':        '#fee2e2',  // light red
 };
