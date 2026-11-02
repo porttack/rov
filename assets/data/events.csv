@@ -68,7 +68,7 @@ class,FALSE,2/11/27,3:00 PM,5:00 PM,,,,,,,HS
 class-extended,,2/12/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 noschool,FALSE,2/16/27,,,,,,,,,HS
 noschool,FALSE,2/18/27,,,,,,,,,HS
-class-extended,,2/19/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
+class-extended,,2/19/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK SLVUSD calendar: Feb 16-18 are non-instructional days,,,MS
 class,FALSE,2/23/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,2/25/27,3:00 PM,5:00 PM,,,,,,,HS
 class-extended,,2/26/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
@@ -77,25 +77,25 @@ class,FALSE,3/4/27,3:00 PM,5:00 PM,,,,,,,HS
 class-extended,,3/5/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,FALSE,3/9/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,3/11/27,3:00 PM,5:00 PM,,,,,,,HS
-class-extended,,3/12/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
+noschool,,3/12/2027,,,No school (PD day),,,,,,MS
 class,FALSE,3/16/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,3/18/27,3:00 PM,5:00 PM,,,,,,,HS
 class-extended,,3/19/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,FALSE,3/23/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,3/25/27,3:00 PM,5:00 PM,,,,,,,HS
-class-extended,,3/26/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK SLVUSD calendar: Good Friday / possible spring break,,,MS
+class-extended,,3/26/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,FALSE,3/30/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,4/1/27,3:00 PM,5:00 PM,,,,,,,HS
-class-extended,,4/2/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK SLVUSD calendar: possible spring break,,,MS
+class-extended,,4/2/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 noschool,FALSE,4/6/27,,,,,,,,,HS
 noschool,FALSE,4/8/27,,,,,,,,,HS
-class-extended,,4/9/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK SLVUSD calendar: possible spring break,,,MS
+noschool,,4/9/2027,,,No school,,,,,,MS
 class,FALSE,4/13/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,4/15/27,3:00 PM,5:00 PM,,,,,,,HS
-class-extended,,4/16/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK: depends on MATE competition date,,,MS
+class-extended,,4/16/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,FALSE,4/20/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,4/22/27,3:00 PM,5:00 PM,,,,,,,HS
-class-extended,,4/23/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK: depends on MATE competition date,,,MS
+class-extended,,4/23/2027,3:00 PM,7:00 PM,MS ROV Team,,,,,,MS
 class,FALSE,4/27/27,3:00 PM,6:00 PM,,,,,,,HS
 class,FALSE,4/29/27,3:00 PM,5:00 PM,,,,,,,HS
 class-extended,,4/30/2027,3:00 PM,7:00 PM,MS ROV Team,,,CHECK: depends on MATE competition date,,,MS
