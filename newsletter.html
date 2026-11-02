@@ -90,6 +90,7 @@ permalink: /newsletter/
   .bg-fieldtrip    { background: #e9d5ff; }
   .bg-mentors      { background: #fce7f3; }
   .bg-presentation { background: #ccfbf1; }
+  .bg-scrimmage    { background: #ddd6fe; }
   .bg-noschool     { background: #f3f4f6; }
   .bg-other        { background: #fee2e2; }
 
@@ -120,12 +121,12 @@ const TYPE_BG = {
   'class': 'bg-class', 'class-extended': 'bg-class-extended', 'service': 'bg-service',
   'competition': 'bg-competition', 'workday': 'bg-workday',
   'fieldtrip': 'bg-fieldtrip', 'mentors': 'bg-mentors',
-  'presentation': 'bg-presentation', 'noschool': 'bg-noschool', 'other': 'bg-other',
+  'presentation': 'bg-presentation', 'scrimmage': 'bg-scrimmage', 'noschool': 'bg-noschool', 'other': 'bg-other',
 };
 const TYPE_ABBREV = {
   'class': 'Class', 'class-extended': 'Class+', 'service': 'Service', 'competition': 'Comp',
   'workday': 'Workday', 'fieldtrip': 'Trip', 'mentors': 'Mentors',
-  'presentation': 'Pres', 'noschool': 'No School', 'other': 'Other',
+  'presentation': 'Pres', 'scrimmage': 'Scrimmage', 'noschool': 'No School', 'other': 'Other',
 };
 
 // ── Masthead ──────────────────────────────────────────────────────────────
@@ -241,6 +242,7 @@ function calendarGrid(allRows, today) {
   <span><span class="leg-swatch bg-fieldtrip"></span>Field Trip</span>
   <span><span class="leg-swatch bg-mentors"></span>Mentors</span>
   <span><span class="leg-swatch bg-presentation"></span>Presentation</span>
+  <span><span class="leg-swatch bg-scrimmage"></span>Scrimmage</span>
   <span><span class="leg-swatch bg-other"></span>Other</span>
   <span><span class="leg-swatch bg-noschool"></span>No School</span>
 </p>`;

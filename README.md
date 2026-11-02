@@ -135,6 +135,7 @@ Enter events in the sheet, then run **ROV → Sync to Google Calendar** to push 
 | `fieldtrip` | light purple | purple | Field trips |
 | `mentors` | light pink | pink | Mentor visits or sessions |
 | `presentation` | light teal | teal | Presentations / demos |
+| `scrimmage` | light violet | — | Scrimmages (shown in violet on the Year view regardless of program) |
 | `noschool` | light gray | — | No-school days (website only, not synced to calendar) |
 | `other` | light red | red | Anything else |
 
