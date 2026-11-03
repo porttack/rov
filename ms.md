@@ -6,7 +6,21 @@ permalink: /ms/
 
 **Middle schoolers designing, building, and piloting underwater robots, and explaining them to real engineers.**
 
-The SLV Middle School ROV Team is a hands-on engineering program for students in grades 6–8. Working in small companies of 3 to 6 students, they build a robot from PVC pipe, motors, and wire, learn to drive it underwater, and take it to the spring MATE ROV Competition regional.
+The SLV Middle School ROV Team is a hands-on engineering program for students in grades 6–8. Working in small companies of 3 to 6 students, they build a robot from PVC pipe, motors, and wire, learn to drive it underwater, and take it to a regional of the spring [MATE ROV Competition](https://materovcompetition.org/), in the [Scout class](https://materovcompetition.org/scout).
+
+## Why MATE
+
+<div style="background:linear-gradient(135deg,#0b3d6b,#1a7fa8); color:#fff; text-align:center; border-radius:6px; padding:0.45em 0.8em; margin:0 0 0.8em; font-size:1.3em; font-weight:bold; line-height:1.25;">The ocean we need for the future we want</div>
+
+The [MATE ROV Competition](https://materovcompetition.org/) is environmental education with a robot in it. That is its mission. MATE embraces the UN's "10 Challenges - 10 Years - One Ocean" and asks students to design and build a remotely operated vehicle, plus the sensors, tooling, and other technology, to monitor the health of the aquatic habitats of our Blue Planet, so we can confidently answer the question "how do we move from the ocean we have to the ocean we want?"
+
+MATE's philosophy is the one we follow:
+
+<div style="background:#eef4fb; border-left:4px solid #1a3a6b; border-radius:4px; padding:0.8em 1.1em; margin:1em 0;" markdown="1">
+The MATE ROV Competition is about **student learning.** It is designed to challenge students to apply the physics, math, electronics, and engineering skills they are learning in the classroom to solving problems from the workplace.
+
+Mentors (teachers, parents, working professionals) are expected to limit their input to educational and inspirational roles and are encouraged to focus on the benefits of the learning process, not simply on "winning" the competition.
+</div>
 
 ## What students build
 
@@ -30,7 +44,7 @@ Measuring and cutting, soldering, basic circuits and fuses, buoyancy, waterproof
 | March | The temperature float, data, and timed practice runs |
 | April | Display board, presentation practice, and competition |
 
-Fridays, 3:00–7:00pm, December through the regional competition (late April or early May). See the [Year calendar](/year/) for exact dates. Mandatory family meeting: Friday, January 8.
+Fridays, 3:00–7:00pm, December through the regional competition (late April or early May). See the [MS team calendar](/year/?hide=hs,charter) for exact dates, or the [full Year calendar](/year/) with every program. Mandatory family meeting: Friday, January 8.
 
 ## We need mentors
 
@@ -38,7 +52,7 @@ This program runs on volunteers. **You don't need to be an engineer.** We need p
 
 Ways to help:
 
-- **Session mentor:** join a Friday (or several) and coach a small company.
+- **Session mentor:** join a Friday (or several, see the [calendar](/year/?hide=hs,charter)) and coach a small company.
 - **Skills mentor:** share what you know for one session: soldering, waterproofing, 3D design, oceanography, presenting.
 - **Safety and logistics:** watch a tool station, help with water tests, or organize the team meal.
 - **Session leader:** later in the season, parents lead full sessions from a written plan.
