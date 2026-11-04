@@ -34,7 +34,9 @@ permalink: /ms/
     .flyer-banner { font-size: 14pt !important; padding: 0.3em 0.6em !important; margin: 0 0 0.5em !important; }
     .flyer-box { padding: 0.4em 0.8em !important; margin: 0.4em 0 !important; font-size: 9.5pt; }
     h2, .flyer-box, table { break-inside: avoid; }
-    #mentors-box { break-before: page; }  /* page 2 starts with the mentors box */
+    /* Page 2 starts with the mentors box; the contact footer sits at the bottom of the page. */
+    .flyer-page2 { break-before: page; display: flex; flex-direction: column; min-height: 9.5in; }
+    .flyer-page2 > .print-only { margin-top: auto; }
     .ms-cal { gap: 0.4em 1em; }
     .ms-cal, .ms-legend { break-inside: avoid; }
     .month-block { break-inside: avoid; }
@@ -80,6 +82,8 @@ Measuring and cutting, soldering, basic circuits and fuses, buoyancy, waterproof
 | April | Display board, presentation practice, and competition |
 
 Fridays, 3:00–7:00pm, December through the regional competition (late April or early May). Exact dates are in the season calendar below, and the [online calendar](/year/?hide=hs,charter) stays current. Mandatory family meeting: Friday, January 8.
+
+<div class="flyer-page2" markdown="1">
 
 <div id="mentors-box" class="flyer-box" style="background:#fff4e0; border:2px solid #f97316; border-radius:6px; padding:0.2em 1.1em 0.6em; margin:1.4em 0;" markdown="1">
 
@@ -133,3 +137,5 @@ document.addEventListener('DOMContentLoaded', () => {
 <p class="print-only" style="border-top:1px solid #999; padding-top:0.4em; font-size:9pt;">
 SLV Middle School ROV &middot; rov.porttack.com/ms &middot; ebrown@slvusd.org
 </p>
+
+</div>
