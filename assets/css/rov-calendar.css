@@ -1,0 +1,40 @@
+/* Month-grid styles shared by year.html and ms.md */
+  .month-title {
+    font-family: Arial, sans-serif; font-weight: bold;
+    font-size: 0.82em; color: #1a3a6b;
+    margin-bottom: 0.2em; letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .month-cal {
+    width: 100%; border-collapse: collapse;
+    font-family: Arial, sans-serif; font-size: 0.72em;
+    table-layout: fixed;
+  }
+  .month-cal th {
+    text-align: center; padding: 1px 0;
+    color: #888; font-weight: bold; font-size: 0.82em;
+  }
+  .month-cal td {
+    text-align: center; padding: 2px 1px; line-height: 1.55;
+    border-radius: 2px;
+  }
+  .month-cal td:empty { background: none; }
+
+  /* Day colors are set inline (see PROGRAM_COLORS in rov-calendar.js);
+     two or three colors on one day get a diagonal split. */
+  /* Canceled (and nothing else that day): red hatch, struck-through number. */
+  .month-cal td.ev-cancelled  {
+    background: repeating-linear-gradient(135deg, #fecaca 0 3px, #fff 3px 6px);
+    color: #b91c1c; text-decoration: line-through;
+  }
+  .month-cal td[data-date] { cursor: pointer; }
+  /* Fade months that are over, and the days already gone in the current month. */
+  .month-block.month-past { opacity: 0.42; }
+  .month-cal td.day-past  { opacity: 0.48; }
+  @media screen and (max-width: 560px) {
+    .month-block.month-past { display: none; }  /* phones: drop past months; print keeps all */
+  }
+  .month-cal td.today { outline: 2px solid #dc2626; outline-offset: -1px; font-weight: bold; }
+  .month-cal td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
