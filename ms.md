@@ -30,6 +30,7 @@ permalink: /ms/
     table th, table td { padding: 2px 6px; }
     a { color: inherit; text-decoration: none; }
     a[href^="http"][href*="slvusd.org"]::after { content: " (" attr(href) ")"; font-size: 7.5pt; word-break: break-all; }
+    a[href$="materovcompetition.org/scout"]::after { content: " (materovcompetition.org/scout)"; font-size: 7.5pt; }
     a[href^="/year"]::after { content: " (rov.porttack.com/year)"; font-size: 7.5pt; }
     .flyer-banner { font-size: 14pt !important; padding: 0.3em 0.6em !important; margin: 0 0 0.5em !important; }
     .flyer-box { padding: 0.4em 0.8em !important; margin: 0.4em 0 !important; font-size: 9.5pt; }
