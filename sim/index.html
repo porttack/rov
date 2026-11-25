@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROV Pool</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe3f5;
+               font: 13px/1.35 -apple-system, system-ui, sans-serif; color: #fff; }
+  canvas { display: block; }
+  .panel { position: fixed; background: rgba(8, 30, 50, .72); border-radius: 8px;
+           padding: 8px 10px; backdrop-filter: blur(4px); }
+  #hud { top: 8px; left: 8px; min-width: 215px; }
+  #hud h1 { margin: 0 0 6px; font-size: 13px; letter-spacing: .04em; }
+  #dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+         background: #e55; margin-right: 6px; }
+  #dot.ok { background: #4d8; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .row .lbl { width: 58px; }
+  .bar { position: relative; flex: 1; height: 10px; background: rgba(255,255,255,.15);
+         border-radius: 5px; overflow: hidden; }
+  .bar i { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: #4d8; }
+  .bar b { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: #fff8; }
+  .imu { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,.2); }
+  .imu .lbl { width: 54px; }
+  #accel, #accel0, #gyro, #joyval1, #joyval2 { font: 12px ui-monospace, Menlo, monospace; white-space: pre; }
+  .num { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  #btns { top: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 250px); }
+  /* two on-screen joysticks side by side under the toolbar (top right): drag with the mouse, they spring back to centre */
+  #rightcol { position: fixed; top: 58px; right: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  #joys { display: flex; gap: 8px; }
+  #cam { position: static; text-align: center; padding: 6px 8px 4px; }
+  #camview { display: block; width: 192px; height: 144px; border-radius: 4px; background: #000; }
+  .joy { position: static; text-align: center; padding: 6px 8px 4px; }
+  .joypad { position: relative; width: 92px; height: 92px; border-radius: 50%; cursor: grab; touch-action: none;
+            border: 1px solid rgba(255,255,255,.4);
+            background: linear-gradient(#fff3, #fff3) center/1px 100% no-repeat, linear-gradient(#fff3, #fff3) center/100% 1px no-repeat,
+                        radial-gradient(circle, rgba(255,255,255,.14), rgba(255,255,255,.04)); }
+  .joypad.drag { cursor: grabbing; }
+  .joyknob { position: absolute; left: 31px; top: 31px; width: 30px; height: 30px; border-radius: 50%; pointer-events: none;
+             background: radial-gradient(circle at 35% 30%, #ffe27a, #f2b705); box-shadow: 0 2px 5px #0006; }
+  /* the switch box: three momentary DPDT switches, like a scout ROV controller */
+  #switchbox { position: static; padding: 6px 10px 4px; }
+  .swrow { display: flex; justify-content: center; gap: 20px; margin-bottom: 4px; }
+  .sw { text-align: center; }
+  .swname { font: 11px ui-monospace, Menlo, monospace; opacity: .85; margin-bottom: 2px; }
+  .swslot { position: relative; width: 36px; height: 84px; margin: 0 auto; border-radius: 17px; cursor: grab; touch-action: none;
+            background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.4); }
+  .swlever { position: absolute; left: 4px; top: 29px; width: 26px; height: 26px; border-radius: 50%; pointer-events: none;
+             background: radial-gradient(circle at 35% 30%, #ddd, #8a97a3); box-shadow: 0 2px 5px #0006; transition: transform .05s; }
+  .swlever.on { background: radial-gradient(circle at 35% 30%, #ffe27a, #f2b705); }
+  .swend { position: absolute; left: 0; right: 0; text-align: center; font: 10px ui-monospace, Menlo, monospace; opacity: .8; pointer-events: none; }
+  .swend.top { top: 4px; } .swend.bot { bottom: 4px; }
+  .swslot.h { width: 92px; height: 36px; }                    /* red and green: lying down, left end = reverse, right end = forward */
+  .swslot.h .swlever { left: 33px; top: 4px; }
+  .swslot.h .swend { top: 10px; bottom: auto; width: 24px; }
+  .swslot.h .swend.l { left: 5px; right: auto; text-align: left; } .swslot.h .swend.r { right: 5px; left: auto; text-align: right; }
+  .sw.red .swname { color: #ff8a80; } .sw.green .swname { color: #7dffa8; }
+  .sw.red .swslot { border-color: #ff8a80aa; } .sw.green .swslot { border-color: #7dffa8aa; }
+  #keyhelp.honly .nonh { opacity: .35; text-decoration: line-through; }
+  .hmode { margin: 6px auto 2px; width: max-content; padding: 2px 10px; border-radius: 10px; cursor: pointer; font: 11px ui-monospace, Menlo, monospace;
+           background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.35); opacity: .85; }
+  .hmode.on { background: #f2b705; color: #111; border-color: #f2b705; opacity: 1; }
+  .swkeys { font: 11px ui-monospace, Menlo, monospace; opacity: .85; margin-top: 3px; white-space: pre; }
+  .joycap { font: 11px ui-monospace, Menlo, monospace; opacity: .85; margin-top: 3px; }
+  @media (max-width: 640px) {
+    #rightcol { top: 8px; }         /* the toolbar moves left in a narrow window, so the pads can take the corner */
+  }
+  @media (max-width: 640px) {      /* narrow window (VS Code side panel): buttons go under the status box */
+    #btns { top: 190px; right: auto; left: 8px; flex-wrap: wrap; max-width: 300px; }
+  }
+  /* small laptop screens (1366 x 768 Chromebooks): tighter panels so the pool stays visible */
+  @media (max-height: 800px) {
+    html, body { font-size: 12px; }
+    .panel { padding: 6px 8px; }
+    #hud { min-width: 190px; }
+    #camview { width: 160px; height: 120px; }
+    #rightcol { top: 52px; gap: 6px; }
+    button { padding: 4px 8px; }
+    #keyhelp, #topics { font-size: 11px !important; }
+  }
+  button { background: #1d6f9f; color: #fff; border: 0; border-radius: 6px;
+           padding: 5px 10px; font: inherit; cursor: pointer; }
+  button.on { background: #f2b705; color: #111; }
+  button.off { opacity: .55; }
+  a.btnlink { background: #1d6f9f; color: #fff; border-radius: 6px; padding: 5px 10px; text-decoration: none; cursor: pointer; }
+  a.btnlink:hover { filter: brightness(1.15); }
+  button:hover { filter: brightness(1.15); }
+  #topics.side { left: auto; right: 8px; }          /* with the keyboard help also showing, topics go bottom-right */
+  #topics { bottom: 8px; left: 8px; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+  #topics div { opacity: .9; }
+  #topics .h { font: 600 12px -apple-system, system-ui, sans-serif; opacity: 1; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div id="hud" class="panel">
+  <h1><span id="dot"></span><span id="status">waiting for sim...</span></h1>
+  <div class="row"><span class="lbl">t1 left</span><div class="bar"><b></b><i id="b-t1"></i></div><span class="num" id="n-t1">0.00</span></div>
+  <div class="row"><span class="lbl">t2 right</span><div class="bar"><b></b><i id="b-t2"></i></div><span class="num" id="n-t2">0.00</span></div>
+  <div class="row"><span class="lbl">t3 front</span><div class="bar"><b></b><i id="b-t3"></i></div><span class="num" id="n-t3">0.00</span></div>
+  <div class="row"><span class="lbl">t4 rear</span><div class="bar"><b></b><i id="b-t4"></i></div><span class="num" id="n-t4">0.00</span></div>
+  <div class="row"><span class="lbl">tool</span><span id="claw">closed</span></div>
+  <div class="row"><span class="lbl">depth</span><span id="depth">0.00 m</span></div>
+  <div class="row"><span class="lbl">heading</span><span id="heading">0&deg;</span></div>
+  <div class="imu">
+    <div class="row"><span class="lbl">tilt</span><svg width="40" height="20" viewBox="0 0 40 20"><g id="tilt"><line x1="4" y1="10" x2="36" y2="10" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="36" cy="10" r="3" fill="#f2b705"/></g></svg><span id="pitch">level</span></div>
+    <div class="row"><span class="lbl">accel</span><span id="accel">+0.000 +0.000 +9.810</span></div>
+    <div class="row"><span class="lbl">minus g</span><span id="accel0">+0.000 +0.000 +0.000</span></div>
+    <div class="row"><span class="lbl">gyro</span><span id="gyro">+0.000 +0.000 +0.000</span></div>
+    <div class="row"><span class="lbl">joy1</span><span id="joyval1">+0.00 +0.00</span></div>
+    <div class="row"><span class="lbl">joy2</span><span id="joyval2">+0.00 +0.00</span></div>
+  </div>
+</div>
+<div id="rightcol">
+<div id="switchbox" class="panel" title="Three momentary switches, like a scout ROV controller. Red = the left thruster (keys 1 and 2), green = the right thruster (arrow keys left / right), bottom = both up/down thrusters (arrow keys up / down). Click and hold with the mouse, or use the keys.">
+  <div class="swrow">
+    <div class="sw red" data-i="0"><div class="swname">red</div><div class="swslot h"><span class="swend l">1</span><div class="swlever"></div><span class="swend r">2</span></div></div>
+    <div class="sw green" data-i="1"><div class="swname">green</div><div class="swslot h"><div class="swlever"></div></div></div>
+  </div>
+  <div class="swrow">
+    <div class="sw" data-i="2"><div class="swname">up / down</div><div class="swslot"><div class="swlever"></div></div></div>
+  </div>
+  <div id="hmode" class="hmode" role="button" title="H key. On: only these three switches work, like the real controller (full power, no mixing). Off: the extra keys (W A S D, R F, Z C, I K) work too.">all keys</div>
+</div>
+<div id="joys">
+  <div class="panel joy" title="joy1: drag with the mouse. Publishes sensor_msgs/Joy on /sim/joy1 (axes[0] left +, axes[1] up +)">
+    <div class="joypad" data-n="1"><div class="joyknob"></div></div><div class="joycap" id="joycap1">joy1</div>
+  </div>
+  <div class="panel joy" title="joy2: drag with the mouse. Publishes sensor_msgs/Joy on /sim/joy2 (axes[0] left +, axes[1] up +)">
+    <div class="joypad" data-n="2"><div class="joyknob"></div></div><div class="joycap" id="joycap2">joy2</div>
+  </div>
+</div>
+<div id="cam" class="panel" title="The ROV's own camera: top front, looking forward, with the front of the claw in view">
+  <canvas id="camview" width="320" height="240"></canvas><div class="joycap">ROV camera</div>
+</div>
+</div>
+<div id="btns" class="panel">
+  <button data-view="orbit" class="on">Orbit</button>
+  <button data-view="follow">Follow</button>
+  <button data-view="top">Top</button>
+  <button id="buoy" title="Pool setting: ROV floats / neutral (hovers) / sinks (B)">Buoyancy: floats</button>
+  <button id="tool" title="Front tool: claw or fixed nose (T)">Tool: Claw</button>
+  <button id="fx" title="Refraction + water ripples (experimental)">Water FX</button>
+  <button id="serial" style="display:none" title="Drive the ROV from a micro:bit or Pico (the Help page has the protocol)">Connect micro:bit / Pico</button>
+  <button id="quality" title="Auto lowers the graphics if the page runs slowly; click to pin High or Low">Quality: Auto</button>
+  <button id="reset">Reset</button>
+  <a id="help" class="btnlink" href="help.html" target="_blank" rel="noopener" title="How it works: the controls, the pool, and the micro:bit / Pico protocol">Help</a>
+</div>
+<pre id="seriallog" class="panel" style="display:none; right: 8px; bottom: 8px; margin: 0; font: 11px/1.4 ui-monospace, Menlo, monospace; max-width: 300px; white-space: pre-wrap;"></pre>
+<div id="keyhelp" class="panel" style="display:none; bottom: 8px; left: 8px; font: 12px/1.5 ui-monospace, Menlo, monospace;">
+  <div style="font: 600 12px -apple-system, system-ui, sans-serif">Keyboard (click the page first)</div>
+  <div>Switch box: &nbsp;1 / 2 red &nbsp;&nbsp;&larr; / &rarr; green &nbsp;&nbsp;&darr; / &uarr; down / up</div>
+  <div class="nonh">W/S forward / reverse &nbsp;&nbsp;A/D turn &nbsp;&nbsp;R/Space up &nbsp;&nbsp;F/Shift down</div>
+  <div class="nonh">I/K nose up/down &nbsp;&nbsp;Z / C one thruster only</div>
+  <div>H: H-bridge only (just the switch box) &nbsp;&nbsp;X stop all</div>
+  <div id="help-claw">[ ] claw closer / wider</div>
+  <div id="help-tool">T claw/nose &nbsp;&nbsp;B buoyancy &nbsp;&nbsp;V reset view (or double-click)</div>
+</div>
+</div>
+<div id="topics" class="panel">
+  <div class="h">Send commands to:</div>
+  <div>/sim/t1 .. /sim/t4 &nbsp;Float32 -1..1</div>
+  <div>/sim/claw &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Float32 0 closed .. 1 open</div>
+  <div class="h" style="margin-top:3px">Read from:</div>
+  <div>/sim/imu &nbsp;/sim/depth &nbsp;/sim/heading</div>
+  <div>/sim/joy1 &nbsp;/sim/joy2 &nbsp;(the pads)</div>
+  <div style="margin-top:3px">T claw/nose &nbsp;&nbsp;B buoyancy &nbsp;&nbsp;V reset view</div>
+</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
