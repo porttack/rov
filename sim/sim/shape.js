@@ -56,7 +56,7 @@ export function localToWorld(rov, fx, ly, uz) {
 
 /** The ROV's solid parts in WORLD coordinates as [a, b, radius, tag] (tag: "frame" | "thruster" | "nose" | "claw"). Cached per pose. */
 export function capsules(rov) {
-  const key = [rov.x, rov.y, rov.depth, rov.yaw, rov.pitch, rov.claw, rov.tool];
+  const key = [rov.x, rov.y, rov.depth, rov.yaw, rov.pitch, rov.claw, rov.tool, rov.thrusters];
   const cached = rov._shape_cache;
   if (cached && cached[0].every((v, i) => v === key[i])) return cached[1];
   const cy = Math.cos(rov.yaw), sy = Math.sin(rov.yaw), cp = Math.cos(rov.pitch), sp = Math.sin(rov.pitch);
@@ -77,14 +77,24 @@ export function capsules(rov) {
   add([0.15, 0, H - 0.05], [0.21, 0, H - 0.05], 0.026, "frame");                          // the camera housing
   add([0, -H, -H], [0, H, -H], PIPE_R, "frame");                                          // bottom crossbars
   add([-H, 0, -H], [H, 0, -H], PIPE_R, "frame");
-  for (const sgn of [-1, 1]) {                                                            // t1 and t2: body and rear shroud
-    add([-0.065, sgn * 0.32, 0], [0.065, sgn * 0.32, 0], 0.036, "thruster");
-    add([-0.075, sgn * 0.32, 0], [-0.06, sgn * 0.32, 0], 0.053, "thruster");
+  // The thrusters, from the layout (THRUSTER_LAYOUTS in physics.js): a horizontal one is a body and a rear shroud along its direction, a vertical one is a
+  // body, a shroud and a propeller. (Horizontal ones in the order of their gy, then gx: for the original layout that is the order this file always had.)
+  const layout = rov.layout || [];
+  for (const th of layout.filter((t) => t.kind === "h").sort((a, b) => a.gy - b.gy || a.gx - b.gx)) {
+    const { gx, gy, dx, dy } = th;
+    add([gx - dx * 0.065, gy - dy * 0.065, 0], [gx + dx * 0.065, gy + dy * 0.065, 0], 0.036, "thruster");
+    add([gx - dx * 0.075, gy - dy * 0.075, 0], [gx - dx * 0.06, gy - dy * 0.06, 0], 0.053, "thruster");
   }
-  for (const sx of [0.17, -0.17]) {                                                       // t3 and t4: body, shroud, propeller
-    add([sx, 0, -0.215], [sx, 0, -0.085], 0.036, "thruster");
-    add([sx, 0, -0.09], [sx, 0, -0.07], 0.056, "thruster");
-    add([sx, 0, -0.078], [sx, 0, -0.072], 0.08, "thruster");
+  for (const th of layout.filter((t) => t.kind === "c")) {                      // a tilted corner thruster: a body and a rear shroud along its direction
+    const { gx, gy, gz, dx, dy, dz } = th;
+    add([gx - dx * 0.065, gy - dy * 0.065, gz - dz * 0.065], [gx + dx * 0.065, gy + dy * 0.065, gz + dz * 0.065], 0.036, "thruster");
+    add([gx - dx * 0.075, gy - dy * 0.075, gz - dz * 0.075], [gx - dx * 0.06, gy - dy * 0.06, gz - dz * 0.06], 0.053, "thruster");
+  }
+  for (const th of layout.filter((t) => t.kind === "v")) {
+    const { gx, gy } = th;
+    add([gx, gy, -0.215], [gx, gy, -0.085], 0.036, "thruster");
+    add([gx, gy, -0.09], [gx, gy, -0.07], 0.056, "thruster");
+    add([gx, gy, -0.078], [gx, gy, -0.072], 0.08, "thruster");
   }
   if (rov.tool === "nose") {
     for (let i = 0; i < NOSE_PTS.length - 1; i++) {

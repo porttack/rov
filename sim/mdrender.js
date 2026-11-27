@@ -7,7 +7,7 @@ export function slug(text) {
   return text.toLowerCase().replace(/<[^>]*>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "section";
 }
 
-const safeUrl = (u) => /^(https?:\/\/|#|[./a-z0-9_-]+(\.[a-z0-9]+)?(#[\w-]*)?$)/i.test(u) && !/^\s*javascript:/i.test(u);
+const safeUrl = (u) => /^(https?:\/\/|#|[./a-z0-9_-]+(\.[a-z0-9]+)?(\?[\w=&%.,-]*)?(#[\w-]*)?$)/i.test(u) && !/^\s*javascript:/i.test(u);
 
 export function inline(text) {
   const codes = [];

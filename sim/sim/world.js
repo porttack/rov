@@ -11,6 +11,7 @@ export class World {
     this.keys = true;
     this._acc = 0;
     this._last = null;
+    this.ringDropper = null;         // set by the page backend when the optional rings add-on is loaded
   }
   /** The page's keyboard command: apply only the channels whose value CHANGED (same rule as apply_keyboard in Python). */
   command(c) {
@@ -21,6 +22,8 @@ export class World {
     if ((c.claw ?? 0) !== (prev.claw ?? 0)) this.rov.claw_target = clamp(Number(c.claw ?? 0), 0.0, 1.0);
     this._prev = { ...c };
   }
+  /** The page's N key: a new ring at (x, y). Returns the ring, or null (no rings add-on loaded, or the pool is full). */
+  dropRing(x, y) { return this.ringDropper ? this.ringDropper(this.rov, x, y) : null; }
   setBuoyancy(mode) { if (mode in BUOYANCY_MODES) this.rov.buoyancy = BUOYANCY_MODES[mode]; }
   setTool(t) { if (t === "claw" || t === "nose") this.rov.tool = t; }
   reset() { this.rov.reset(); }

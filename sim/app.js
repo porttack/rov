@@ -3,6 +3,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/OrbitControls.js";
 import { GAME_KEYS, SWITCHES, computeCommand, switchValues } from "./controls.js";
+import { MAX_RINGS, parseConfig, toQuery, poolSizeText } from "./config.js";
+import { layoutFor } from "./sim/physics.js";
+import { deckEye, nearestSide } from "./deckcam.js";                      // (the thruster layouts: the same table the server uses; the state carries its own)
 
 // Which simulation? A Python server answers GET ping -> talk to it; a plain web host (GitHub Pages...) does not -> run the sim in this page.
 // Override with ?mode=local or ?mode=server.
@@ -13,6 +16,8 @@ async function pickBackend() {
   return server ? import("./backend-net.js") : import("./backend-local.js");
 }
 const backend = await pickBackend();
+const cfg = parseConfig(location.search);                 // ?controls= ?camera= ... and ?config (see config.js); the pool, rings and fish are read by backend-local.js
+if (cfg.controls === "h-hidden") document.body.classList.add("bare");      // H-circuit only, and every other control hidden (CSS: body.bare)
 
 const $ = (id) => document.getElementById(id);
 
@@ -29,6 +34,7 @@ const scene = new THREE.Scene();
 const SKY = new THREE.Color(0xbfe3f5), WATER = new THREE.Color(0x0b5f8a);
 scene.background = SKY;
 const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 60);
+const FOV0 = 55;                                  // (the other views; the deck view zooms in)
 camera.position.set(-2.6, 1.6, 3.0);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, -0.8, 0);
@@ -36,6 +42,8 @@ controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.98;
 controls.minDistance = 0.8;
 controls.maxDistance = 16;
+controls.zoomToCursor = true;                  // the wheel zooms towards the mouse pointer: easy to dive into a detail and to back out again
+controls.zoomSpeed = 1.6;
 controls.screenSpacePanning = true;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x4a88aa, 1.4));
@@ -50,7 +58,7 @@ let regions = [{ x0: -3, x1: 3, z0: -1.5, z1: 1.5, d: 2 }];        // until the 
 let regionsKey = "";
 let bbox = { x0: -3, x1: 3, z0: -1.5, z1: 1.5 }, maxDepth = 2;
 function setRegions(list) {
-  regions = list.map(([x0, x1, y0, y1, d]) => ({ x0, x1, z0: -y1, z1: -y0, d }));
+  regions = list.map(([x0, x1, y0, y1, d]) => ({ x0, x1, z0: -y1, z1: -y0, d }));       // (the sim's list includes the stairs: they are two more little regions with shallower floors)
   bbox = { x0: Math.min(...regions.map((r) => r.x0)), x1: Math.max(...regions.map((r) => r.x1)),
            z0: Math.min(...regions.map((r) => r.z0)), z1: Math.max(...regions.map((r) => r.z1)) };
   maxDepth = Math.max(...regions.map((r) => r.d));
@@ -244,7 +252,8 @@ function buildPool() {
 
   // deck: everything around the pool that isn't pool (cells of a grid made from the region edges)
   {
-    const xs = new Set([bbox.x0 - 7, bbox.x1 + 7]), zs = new Set([bbox.z0 - 6, bbox.z1 + 6]);
+    const grow = Math.max(1, Math.sqrt(bw * bh / 18));                                   // a bigger pool gets a bigger deck around it
+    const xs = new Set([bbox.x0 - 7 * grow, bbox.x1 + 7 * grow]), zs = new Set([bbox.z0 - 6 * grow, bbox.z1 + 6 * grow]);
     for (const r of regions) { xs.add(r.x0); xs.add(r.x1); zs.add(r.z0); zs.add(r.z1); }
     const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b), pos = [], idx = [];
     for (let i = 0; i < X.length - 1; i++) for (let j = 0; j < Z.length - 1; j++) {
@@ -263,22 +272,40 @@ function buildPool() {
     solid(deck, (c) => c.y < 0.01);
   }
 
-  // lane line + 1 m tick marks on the deep floor: makes motion easy to see
+  // one lane line down the middle of each 3 m lane on the deep floor (a wide pool has several), with a "T" at each end like a real pool, and short 1 m ruler ticks
+  // along it (short, so a wide pool does not look striped). Together they make motion easy to see.
   {
     const deep = regions.reduce((a, b) => (b.d > a.d ? b : a)), dark = new THREE.MeshBasicMaterial({ color: 0x14384d });
-    const mz = (deep.z0 + deep.z1) / 2, len = deep.x1 - deep.x0;
-    const lane = new THREE.Mesh(new THREE.BoxGeometry(len, 0.005, 0.06), dark);
-    lane.position.set((deep.x0 + deep.x1) / 2, -deep.d + 0.004, mz);
-    pool.add(lane);
-    for (let x = Math.ceil(deep.x0 + 1e-6); x < deep.x1; x += 1) {
-      const tick = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.005, (deep.z1 - deep.z0) * 0.5), dark);
-      tick.position.set(x, -deep.d + 0.004, mz);
-      pool.add(tick);
+    const len = deep.x1 - deep.x0, y = -deep.d + 0.004, lanes = Math.max(1, Math.round((deep.z1 - deep.z0) / 3)), laneW = (deep.z1 - deep.z0) / lanes;
+    const mark = (w, h, x, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.005, h), dark); m.position.set(x, y, z); pool.add(m); };
+    for (let i = 0; i < lanes; i++) {
+      const mz = deep.z0 + (i + 0.5) * laneW;
+      mark(len - 1.0, 0.06, (deep.x0 + deep.x1) / 2, mz);                                   // the line stops short of the walls...
+      for (const sx of [deep.x0 + 0.5, deep.x1 - 0.5]) mark(0.06, 0.7, sx, mz);             // ... where a T crosses it
+      for (let x = Math.ceil(deep.x0 + 1.5); x < deep.x1 - 1.0; x += 1) mark(0.05, 0.3, x, mz);
+    }
+  }
+
+  // ---- depth marks in metres on the near end wall of the main pool (so a ROV's depth can be read off the wall): a ruler with a number plate every metre ----
+  {
+    const deep = regions.reduce((a, b) => (b.d > a.d ? b : a)), x = deep.x0 + 0.012, zc = (deep.z0 + deep.z1) / 2;
+    const ink = new THREE.MeshBasicMaterial({ color: 0x0b2a3d });
+    const strip = (w, h, y, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateY(Math.PI / 2), ink); m.position.set(x, y, z); pool.add(m); };
+    strip(0.05, deep.d - 0.02, -deep.d / 2, zc - 0.3);                                       // the ruler's rail, then a tick every half metre and a plate every metre
+    for (let k = 0.5; k < deep.d - 0.01; k += 0.5) strip(Number.isInteger(k) ? 0.3 : 0.15, 0.03, -k, zc - (Number.isInteger(k) ? 0.15 : 0.225));
+    for (let k = 0; k < deep.d - 0.01; k += 1) {                                              // 0 m is the surface
+      const c = document.createElement("canvas"); c.width = 128; c.height = 64;
+      const g = c.getContext("2d"); g.fillStyle = "#0b2a3d"; g.fillRect(0, 0, 128, 64);
+      g.fillStyle = "#ffffff"; g.font = "bold 40px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(`${k} m`, 64, 34);
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.18).rotateY(Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) }));
+      plate.position.set(x + 0.002, -k - (k === 0 ? 0.12 : 0), zc - 0.55);
+      pool.add(plate);
     }
   }
 
   // ---- water surface: one wavy grid over the pool's bounding box, only the cells that are water are drawn ----
-  NX = Math.max(8, Math.round(bw / CELL)); NZ = Math.max(8, Math.round(bh / CELL));
+  const cell = CELL * Math.max(1, Math.sqrt(bw * bh / 33));      // a bigger pool gets coarser water cells: the grid never has more cells than the original pool's (33 m2), so it stays cheap on a Chromebook
+  NX = Math.max(8, Math.round(bw / cell)); NZ = Math.max(8, Math.round(bh / cell));
   DX = bw / NX; DZ = bh / NZ;
   const S = NX + 1, geo = new THREE.PlaneGeometry(bw, bh, NX, NZ).rotateX(-Math.PI / 2).translate(cx, 0, cz);
   const index = [];
@@ -391,13 +418,13 @@ const rov = new THREE.Group();
 scene.add(rov);
 const H = 0.25;                          // half the cube side
 
-function bar(a, b, r = 0.014) {          // PVC pipe from point a to point b
+function bar(a, b, r = 0.014, parent = rov) {          // PVC pipe from point a to point b
   const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
   const len = va.distanceTo(vb);
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12), PVC);
   m.position.copy(va).add(vb).multiplyScalar(0.5);
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.sub(va).normalize());
-  rov.add(m);
+  parent.add(m);
 }
 for (const sy of [-1, 1]) for (const sz of [-1, 1]) bar([-H, sy * H, sz * H], [H, sy * H, sz * H]);   // along x
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) bar([sx * H, -H, sz * H], [sx * H, H, sz * H]);   // vertical
@@ -435,7 +462,7 @@ function showFoam(buoyancy) {
   foamFloat.visible = buoyancy > 0.05;
   foamNeutral.visible = buoyancy >= -0.05 && buoyancy <= 0.05;
 }
-showFoam(1.5);                                         // (the default is "floats"; the real value arrives with the first state)
+showFoam(0);                                           // (the default is "neutral"; the real value arrives with the first state)
 
 function makeThruster(shroudMat) {
   const g = new THREE.Group();                         // axis = local +Y
@@ -454,28 +481,63 @@ function makeThruster(shroudMat) {
   g.userData.prop = prop;
   return g;
 }
-// left (port, red) and right (starboard, green): axis along the ROV's forward x
-const left = makeThruster(PORT), right = makeThruster(STBD);
-const vfront = makeThruster(PVC), vrear = makeThruster(PVC);       // vertical thrusters, near the nose and the tail
-left.rotation.z = right.rotation.z = -Math.PI / 2;     // local +Y -> ROV +x
-left.position.set(0, 0, -H - 0.07);                     // sim "left" is three -z
-right.position.set(0, 0, H + 0.07);
-vfront.position.set(0.17, -H + 0.1, 0);     // low on the frame (THRUSTER_UP / VERT_ARM in rov_physics.py)
-vrear.position.set(-0.17, -H + 0.1, 0);
-vfront.rotation.x = vrear.rotation.x = Math.PI;       // propeller end up, so it clears the bar below
-rov.add(left, right, vfront, vrear);
+// The thrusters are built from the layout (3, 4, 6 or 8 of them: THRUSTER_LAYOUTS in sim/physics.js) and rebuilt when the layout changes.
+// A horizontal one (red = left, green = right) points along its thrust direction; a vertical (white) one hangs low on the frame with its propeller up.
+const SHROUD = { red: PORT, green: STBD, white: PVC };
+const thrusterGroup = new THREE.Group();
+rov.add(thrusterGroup);
+let rig = [], rigN = 0;                                  // [{ name, kind, node, axis }]: what is built now
+function buildThrusters(layout) {
+  thrusterGroup.clear();
+  rig = layout.map((t) => {
+    const node = makeThruster(SHROUD[t.color] || PVC);
+    let axis;
+    if (t.kind === "h") {                                // sim (x ahead, y left) -> three (x, -depth, -y)
+      axis = new THREE.Vector3(t.dx, 0, -t.dy);
+      node.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);   // local +Y -> its thrust direction
+      node.position.set(t.gx, 0, -t.gy);
+      if (Math.abs(t.gx) > 0.2) bar([Math.sign(t.gx) * H, 0, -Math.sign(t.gy) * H], [t.gx, 0, -t.gy], 0.012, thrusterGroup);   // a short strut from the corner post
+    } else if (t.kind === "c") {                         // a corner thruster tilted 45 degrees: sim (x ahead, y left, z up) -> three (x, z, -y)
+      axis = new THREE.Vector3(t.dx, t.dz, -t.dy);
+      node.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+      node.position.set(t.gx, t.gz, -t.gy);
+      bar([Math.sign(t.gx) * H, Math.sign(t.gz) * H, -Math.sign(t.gy) * H], [t.gx, t.gz, -t.gy], 0.012, thrusterGroup);   // a short strut from the corner joint
+    } else {
+      axis = new THREE.Vector3(0, 1, 0);
+      node.position.set(t.gx, -H + 0.1, -t.gy);          // low on the frame (THRUSTER_UP / VERT_ARM in rov_physics.py)
+      node.rotation.x = Math.PI;                          // propeller end up, so it clears the bar below
+      if (Math.abs(t.gx) > 0.1 && Math.abs(t.gy) > 0.1) bar([Math.sign(t.gx) * H, -H, -Math.sign(t.gy) * H], [t.gx, -H, -t.gy], 0.012, thrusterGroup);   // (corner mounts)
+    }
+    thrusterGroup.add(node);
+    if (t.kind === "h" && t.gx === 0) {                  // the original side thrusters: a mid-height rail along the frame, two pipes to two clamps round the thruster
+      const sz = -Math.sign(t.gy);
+      bar([-H, 0, sz * H], [H, 0, sz * H], 0.013, thrusterGroup);
+      for (const dx of [-0.045, 0.045]) { bar([dx, 0, sz * H], [dx, 0, sz * (H + 0.05)], 0.013, thrusterGroup); collar(dx, 0, sz * (H + 0.07), 0.026, 0.085, 0.085); }
+    }
+    if (t.kind === "v" && t.gy === 0) {                  // vertical thrusters sit on the bottom bar, clamped to it
+      collar(t.gx, -H + 0.025, 0, 0.085, 0.04, 0.085);   // saddle between the bar and the thruster body
+      collar(t.gx, -H, 0, 0.03, 0.03, 0.07);             // clamp round the bar itself
+    }
+    return { name: t.name, kind: t.kind, node, axis };
+  });
+  rigN = layout.length;
+}
+buildThrusters(layoutFor(4));
 
 // ---- camera: a small housing on a short pipe under the top-front edge, looking forward and tilted down so the
 // front of the claw is in view. rovCam is the actual three.js camera (its picture goes to the window under joy2). ----
-bar([0.25, H, 0], [0.19, H - 0.045, 0], 0.012);                                  // mount: a pipe from the top-front edge
+const camModel = new THREE.Group();                                              // the camera on the model: hidden by ?camera=off
+bar([0.25, H, 0], [0.19, H - 0.045, 0], 0.012, camModel);                        // mount: a pipe from the top-front edge
 {
   const housing = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.042, 0.052), DARK);
   housing.position.set(0.18, H - 0.05, 0);
   const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.012, 16).rotateZ(Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0x1d4f7a, roughness: 0.1, metalness: 0.6 }));
   lens.position.set(0.2225, H - 0.05, 0);
-  rov.add(housing, lens);
+  camModel.add(housing, lens);
 }
+rov.add(camModel);
+camModel.visible = cfg.camera;
 const rovCam = new THREE.PerspectiveCamera(64, 4 / 3, 0.03, 40);
 rovCam.rotation.order = "YXZ";
 rovCam.rotation.set(-0.5, -Math.PI / 2, 0);        // look along the ROV's +x (yaw -90 deg), tilted down 0.5 rad (~29 deg)
@@ -486,18 +548,7 @@ rov.add(rovCam);
 function collar(x, y, z, sx, sy, sz) {              // a dark clamp block
   const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), DARK);
   m.position.set(x, y, z);
-  rov.add(m);
-}
-for (const sz of [-1, 1]) {
-  bar([-H, 0, sz * H], [H, 0, sz * H], 0.013);         // a mid-height rail along each side of the frame
-  for (const dx of [-0.045, 0.045]) {                  // two pipes from the rail to two clamps round the thruster
-    bar([dx, 0, sz * H], [dx, 0, sz * (H + 0.05)], 0.013);
-    collar(dx, 0, sz * (H + 0.07), 0.026, 0.085, 0.085);
-  }
-}
-for (const x of [-0.17, 0.17]) {                       // vertical thrusters sit on the bottom bar, clamped to it
-  collar(x, -H + 0.025, 0, 0.085, 0.04, 0.085);        // saddle between the bar and the thruster body
-  collar(x, -H, 0, 0.03, 0.03, 0.07);                  // clamp round the bar itself
+  thrusterGroup.add(m);
 }
 
 // ---- front tool, two modes (button / T key): a fixed curved-up "nose", or a claw that opens and closes ----
@@ -555,7 +606,8 @@ function makeBubbles() {
   scene.add(pts);
   return { pts, vel: new Float32Array(NB * 3), life: new Float32Array(NB), next: 0, acc: 0 };
 }
-const bubbles = { t1: makeBubbles(), t2: makeBubbles(), t3: makeBubbles(), t4: makeBubbles() };   // t1 left, t2 right, t3 front, t4 rear
+const bubbles = {};                                    // one stream of bubbles per thruster, made when it is first used (t1 ... t8)
+for (let i = 1; i <= 8; i++) bubbles["t" + i] = makeBubbles();
 
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 function emit(b, thruster, localAxis, cmd, dt) {
@@ -634,6 +686,7 @@ function stepSilt(dt) {
     sp.scale.setScalar(0.12 + (1 - f) * 0.3);
   }
 }
+let jPresses = [];                    // when the J key was pressed lately
 let wobble = 0;                       // decaying rocking after a splash or a bump
 rov.rotation.order = "YXZ";           // yaw first, then roll about the ROV's own forward axis
 
@@ -642,10 +695,22 @@ let props = null;
 import("./props.js").then((m) => { props = new m.Props(scene, THREE); }).catch(() => { /* no props */ });
 let fish = null;                      // optional add-on: fish.js draws the coy fish (delete that file to remove it)
 import("./fish.js").then((m) => { fish = new m.Fish(scene, THREE); }).catch(() => { /* no fish */ });
+let missionHud = null;                // a mission (?mission=): the score board, the clock and the crew's inventory (missions/common/hud.js); nothing is loaded without one
+if (backend.features.mission) import("./missions/common/hud.js").then((m) => { missionHud = m.setupMissionHud({ backend, toast }); }).catch((e) => console.warn("mission panel failed:", e));
+let missionView = null;               // the mission's props, drawn (missions/<name>/props3d.js)
+if (backend.features.mission) import(`./missions/${cfg.mission}/props3d.js`).then((m) => { missionView = new m.MissionView(scene, THREE); }).catch((e) => console.warn("mission props failed:", e));
+let eels = null;                      // optional joke add-on: eel.js draws the electric eel, the sparks and the smoke (delete that file to remove them)
+import("./eel.js").then((m) => { eels = new m.Eels(scene, THREE); }).catch(() => { /* no eel */ });
+let crabs = null;                     // optional add-on: crab.js draws the green crabs (delete that file to remove them)
+import("./crab.js").then((m) => { crabs = new m.Crabs(scene, THREE); }).catch(() => { /* no crabs */ });
+let jets = null;                      // optional add-on: jets.js draws the water outlets and the current (delete that file to remove them)
+import("./jets.js").then((m) => { jets = new m.Jets(scene, THREE, { look: cfg.flow, ripple: (x, z, r, k) => { if (fx) drop(x, z, r, k); } }); }).catch(() => { /* no jets */ });
 
 // ---------- state from the sim ----------
-const state = { x: -1.5, y: 0, depth: 0.8, yaw: 0, t1: 0, t2: 0, t3: 0, t4: 0, claw: 0, speed: 0, pitch: 0, imu: null, buoyancy: 1.5, joys: [[0, 0], [0, 0]], joy_topics: [] };
-const seen = { splash: null, floor: null };
+const state = { x: -1.5, y: 0, depth: 0.8, yaw: 0, thrusters: 4, t1: 0, t2: 0, t3: 0, t4: 0, claw: 0, speed: 0, pitch: 0, roll: 0, imu: null, buoyancy: 0, joys: [[0, 0], [0, 0]], joy_topics: [] };
+const seen = { splash: null, floor: null, eel: "idle" };
+const eelProp = () => (state.props || []).find((p) => p.type === "eel");
+const eelDead = () => (state.props || []).some((p) => p.locked);       // the eel got the ROV (eel.js) or the mission clock ran out (missions/): nothing works until it is over
 const shown = { ...state };
 let lastMsg = 0;
 
@@ -653,8 +718,10 @@ let lastMsg = 0;
   const f = backend.features, hide = (sel) => document.querySelectorAll(sel).forEach((e) => { e.style.display = "none"; });
   if (!f.joys) { hide("#joys"); hide("#joyval1, #joyval2"); document.querySelectorAll("#joyval1, #joyval2").forEach((e) => { e.parentElement.style.display = "none"; }); }
   if (!f.imu) hide(".imu");
+  if (!f.rings) hide("#help-ring");
+  if (!f.current) hide("#help-jets");
   if (!f.claw) { hide("#help-claw"); const t = $("help-tool"); if (t) t.textContent = "B buoyancy   V reset view (or double-click)"; }
-  if (!f.claw) { hide("#tool"); const c = $("claw"); if (c && !f.rings) c.parentElement.style.display = "none"; }
+  if (!f.claw) { const c = $("claw"); if (c && !f.rings) c.parentElement.style.display = "none"; }
 }
 backend.connect(handleState);
 if (backend.features.serial && backend.link) {          // micro:bit / Pico over USB (browser version only; with the Python sim use nodes/serial_bridge)
@@ -672,6 +739,11 @@ function handleState(s) {
   }
   Object.assign(state, s);
   lastMsg = performance.now();
+  const eel = eelProp();
+  if (eel && eel.mode !== seen.eel) {
+    if (eel.mode === "bite") { held.clear(); sendCommand(); wobble = 1; }
+    seen.eel = eel.mode;
+  }
   if (s.tool && s.tool !== tool && performance.now() - toolAsked > 600) setTool(s.tool, false);   // sim changed it
   if (seen.splash === null) { seen.splash = s.splash_n; seen.floor = s.floor_n; }   // ignore history
   if (s.splash_n !== seen.splash) {                       // top of the ROV crossed the surface
@@ -686,14 +758,27 @@ function handleState(s) {
   }
 }
 
-const bars = ["t1", "t2", "t3", "t4"];
+let hudN = 0;                                           // the thruster bars on show
+function buildHud(layout) {
+  $("thrusters").innerHTML = layout.map((t) => `<div class="row"><span class="lbl">${t.name} ${t.label}</span><div class="bar"><b></b><i id="b-${t.name}"></i></div><span class="num" id="n-${t.name}">0.00</span></div>`).join("");
+  hudN = layout.length;
+  $("help-t6").style.display = layout.length > 4 ? "" : "none";
+  $("help-t8").style.display = layout.length > 6 ? "" : "none";
+}
+buildHud(layoutFor(4));
+function syncRig() {                                    // the sim's layout changed (Config, or the server's --thrusters): rebuild the model and the bars
+  const n = state.thrusters || 4;
+  if (n !== rigN) { buildThrusters(state.layout || layoutFor(n)); for (const k in bubbles) bubbles[k].life.fill(0); }
+  if (n !== hudN) buildHud(state.layout || layoutFor(n));
+}
 function updateHud() {
+  syncRig();
   drawSwitches();
   const live = performance.now() - lastMsg < 1000;
   $("dot").className = live ? "ok" : "";
   $("status").textContent = live ? backend.name : "waiting for sim...";
-  for (const n of bars) {
-    const v = state[n], el = $("b-" + n);
+  for (const { name: n } of rig) {
+    const v = state[n] || 0, el = $("b-" + n);
     el.style.width = Math.abs(v) * 50 + "%";
     el.style.transform = v < 0 ? "translateX(-100%)" : "none";
     el.style.background = v < 0 ? "#f95" : "#4d8";
@@ -716,18 +801,25 @@ function updateHud() {
     $("tilt").setAttribute("transform", `rotate(${deg.toFixed(1)} 20 10)`);
     $("accel").textContent = `${f(im.ax)} ${f(im.ay)} ${f(im.az)}`;
     const g = 9.81, sp = Math.sin(im.pitch), cp = Math.cos(im.pitch);      // gravity as the tilted accelerometer sees it
-    $("accel0").textContent = `${f(im.ax + g * sp)} ${f(im.ay)} ${f(im.az - g * cp)}`;
+    const rr = im.roll || 0, sr = Math.sin(rr), cr = Math.cos(rr);          // heeling over leans gravity into the y axis too
+    $("accel0").textContent = `${f(im.ax + g * sp)} ${f(im.ay - g * cp * sr)} ${f(im.az - g * cp * cr)}`;
+    const rdeg = rr * 180 / Math.PI;
+    $("rollv").textContent = (rdeg >= 0 ? "+" : "") + rdeg.toFixed(1) + "\u00b0" + (rdeg > 0.5 ? " right side down" : rdeg < -0.5 ? " left side down" : " level");
     $("gyro").textContent = `${f(im.gx)} ${f(im.gy)} ${f(im.gz)}`;
   }
   const bu = state.buoyancy ?? 0;
   showFoam(bu);
-  $("buoy").textContent = "Buoyancy: " + (bu > 0.05 ? "floats" : bu < -0.05 ? "sinks" : "neutral");
+  $("current").textContent = "Current: " + (jetsRunning() ? "on" : "off");
+  $("current").classList.toggle("on", jetsRunning());
   joys.forEach((j, i) => {
     const jy = (state.joys && state.joys[i]) || [0, 0];
     if (!j.down) j.knob.style.transform = `translate(${-jy[0] * JOY_REACH}px, ${-jy[1] * JOY_REACH}px)`;   // show the shared value
     $("joyval" + j.n).textContent = `${jy[0] >= 0 ? "+" : "-"}${Math.abs(jy[0]).toFixed(2)} ${jy[1] >= 0 ? "+" : "-"}${Math.abs(jy[1]).toFixed(2)}`;
     $("joycap" + j.n).textContent = state.ros ? (state.joy_topics && state.joy_topics[i]) || `joy${j.n} (not published)` : `joy${j.n} (no ROS)`;
   });
+  const hasJets = (state.props || []).some((p) => p.type === "jets" && p.on);   // the water is running (the outlets are in the wall either way)
+  $("row-current").style.display = hasJets ? "" : "none";
+  if (hasJets && state.water) $("currentv").textContent = Math.hypot(state.water[0], state.water[1]).toFixed(2) + " m/s";
   $("depth").textContent = state.depth.toFixed(2) + " m";
   $("heading").textContent = Math.round(((state.yaw * 180 / Math.PI) % 360 + 360) % 360) + "°";
 }
@@ -735,11 +827,13 @@ function updateHud() {
 // ---------- keyboard (only when the server is keyboard_sim.py: state.keys) ----------
 const held = new Set();
 let clawCmd = 0, lastSent = "";
-let hOnly = false;                                            // "H-bridge only": only the three switches work (H key / the badge on the box)
+let hOnly = cfg.controls !== "all";                                            // "H-bridge only": only the three switches work (H key / the badge on the box)
+const hLocked = cfg.explicit.has("controls");                 // ?controls= in the address decides the mode: the H key and the badge do nothing then
 try { hOnly = localStorage.getItem("rovHOnly") === "on"; } catch (e) { /* no storage: keep default */ }
+if (hLocked) hOnly = cfg.controls !== "all";
 function setHOnly(on, send = true) {
   hOnly = on;
-  try { localStorage.setItem("rovHOnly", on ? "on" : "off"); } catch (e) { /* ignore */ }
+  if (!hLocked) try { localStorage.setItem("rovHOnly", on ? "on" : "off"); } catch (e) { /* ignore */ }
   const b = $("hmode");
   b.classList.toggle("on", on);
   b.textContent = on ? "H-bridge only" : "all keys";
@@ -748,23 +842,78 @@ function setHOnly(on, send = true) {
 }
 const pointerSw = [0, 0, 0];                                  // the on-screen switch box: -1 / 0 / +1 per switch while the mouse holds it
 function sendCommand() {
-  const body = JSON.stringify(computeCommand(held, pointerSw, clawCmd, { hOnly }));
+  const body = JSON.stringify(computeCommand(held, pointerSw, clawCmd, { hOnly, thrusters: state.thrusters || 4 }));
   if (body === lastSent) return;
   lastSent = body;
   backend.cmd(JSON.parse(body));
 }
 window.addEventListener("keydown", (e) => {
+  if (document.getElementById("configui")) return;                    // the ?config panel is open: typing in it must not drive the ROV
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.code === "KeyL" || e.code === "KeyW" || e.code === "KeyD" || e.code === "Period")) {      // Ctrl + L / W / D (Ctrl + . also widens): the pool grows (never shrinks), the ROV stays where it is
+    e.preventDefault();
+    if (e.repeat || !backend.growPool || document.getElementById("configui")) return;
+    const what = { KeyL: "length", KeyW: "width", Period: "width", KeyD: "depth" }[e.code], r = backend.growPool(what);
+    if (r) { userMoved = false; toast(`Pool: ${poolSizeText(r[0], r[1])}, ${r[2]} m deep`); } else toast(`The pool cannot get any ${what === "depth" ? "deeper" : what === "length" ? "longer" : "wider"}`);
+    return;
+  }
+  if (missionHud && missionHud.modal) return;                          // the inventory is open: it has the keyboard
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "KeyV" && !e.repeat) { resetView(); return; }
+  if (eelDead()) { e.preventDefault(); return; }
+  if (backend.features.mission && !e.repeat) {                                // the mission's crew keys
+    if (e.code === "KeyG") { backend.missionDeliver(); return; }
+    if (e.code === "Tab" && missionHud) { e.preventDefault(); missionHud.toggleInventory(); return; }
+  }
+  if (e.code === "KeyL" && !e.repeat) { if (backend.features.eel) backend.summonEel(); return; }
   if (e.code === "KeyB" && !e.repeat) { nextBuoyancy(); return; }
   if (e.code === "KeyT" && !e.repeat) { if (backend.features.claw) setTool(tool === "claw" ? "nose" : "claw"); return; }
+  if (e.code === "KeyN" && !e.repeat) { if (backend.features.rings) dropRing(); return; }
+  if (e.code === "KeyJ" && !e.repeat) {
+    if (jets) toast("Water look: " + jets.cycleLook() + " (J changes it)");
+    const now = performance.now();                                    // (easter egg: J pressed over and over)
+    jPresses = jPresses.filter((t) => now - t < 5000); jPresses.push(now);
+    if (jPresses.length >= 8) { jPresses = []; if (backend.features.eel) backend.summonEel(); }
+    return;
+  }
   if (!state.keys) return;
   if (GAME_KEYS.has(e.code)) { held.add(e.code); e.preventDefault(); }
-  else if (e.code === "KeyH" && !e.repeat) { setHOnly(!hOnly); return; }
+  else if (e.code === "KeyH" && !e.repeat) { if (!hLocked) setHOnly(!hOnly); return; }
   else if (e.code === "KeyX") held.clear();
   else return;
   sendCommand();
 });
+// ---------- N: drop a new pool ring into the water where the mouse is (it sinks) ----------
+let toastTimer = 0;
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text; t.style.display = "block";
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.display = "none"; }, 2600);
+}
+let mouse = null;                                              // where the pointer is over the 3D view (null when it is over a panel or outside the window)
+window.addEventListener("pointermove", (e) => { mouse = e.target === renderer.domElement ? { x: e.clientX, y: e.clientY } : null; });
+document.documentElement.addEventListener("pointerleave", () => { mouse = null; });
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _water = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3();
+function waterUnderMouse() {                                   // the point of the water surface under the pointer, as sim (x, y), or null if it is not over the pool
+  if (!mouse) return null;
+  const r = renderer.domElement.getBoundingClientRect();
+  _ndc.set(((mouse.x - r.left) / r.width) * 2 - 1, -((mouse.y - r.top) / r.height) * 2 + 1);
+  _ray.setFromCamera(_ndc, camera);
+  if (!_ray.ray.intersectPlane(_water, _hit) || !insidePool(_hit.x, _hit.z)) return null;
+  return { x: _hit.x, y: -_hit.z };                            // three.js z is the sim's -y
+}
+function dropRing() {
+  if (eelDead()) return;
+  const p = waterUnderMouse();
+  if (!p) { toast("Point the mouse at the water of the pool (move it a little first), then press N."); return; }
+  const n = (state.props || []).filter((q) => q.type === "ring").length;
+  if (n >= MAX_RINGS) { toast(`The pool already has ${MAX_RINGS} rings: that is the most. (Reset puts it back.)`); return; }
+  if (typeof backend.dropRing !== "function") { toast("This page is a mix of old and new files: reload it with Ctrl+Shift+R (Cmd+Shift+R on a Mac)."); return; }
+  try {
+    Promise.resolve(backend.dropRing(p.x, p.y)).then(
+      (r) => toast(r === null ? "No ring was dropped (the rings add-on is not loaded)." : `Ring dropped: ${n + 1} in the pool.`),
+      (e) => toast("Could not drop a ring: " + (e && e.message ? e.message : e)));
+  } catch (e) { console.error(e); toast("Could not drop a ring: " + e.message); }
+}
 window.addEventListener("keyup", (e) => { if (held.delete(e.code)) sendCommand(); });
 window.addEventListener("blur", () => { held.clear(); sendCommand(); });   // never leave a thruster stuck on
 
@@ -786,7 +935,8 @@ swEls.forEach((el, i) => {
   slot.addEventListener("pointercancel", release);
   window.addEventListener("blur", release);
 });
-$("hmode").addEventListener("click", () => setHOnly(!hOnly));
+$("hmode").addEventListener("click", () => { if (!hLocked) setHOnly(!hOnly); });
+if (hLocked) $("hmode").style.cursor = "default";                   // (set by the page address; no tooltip, it would cover the pool)
 setHOnly(hOnly, false);
 function drawSwitches() {
   switchValues(held, pointerSw).forEach((v, i) => {
@@ -799,21 +949,24 @@ function drawSwitches() {
 // ---------- tool mode (claw / nose): the sim owns it, this just shows it and asks to change it ----------
 let tool = backend.defaultTool || "claw", toolAsked = 0;
 function setTool(t, send = true) {
+  if (eelDead()) return;
   tool = t;
   claw.visible = t === "claw"; nose.visible = t === "nose";
-  $("tool").textContent = "Tool: " + (t === "claw" ? "Claw" : "Nose");
   if (send) { toolAsked = performance.now(); backend.tool(t); }
 }
-$("tool").addEventListener("click", () => setTool(tool === "claw" ? "nose" : "claw"));
 setTool(backend.features.claw ? tool : "nose", false);       // no claw in this backend: the fixed nose
 
 // ---------- buoyancy: floats -> neutral -> sinks (a pool setting, not a ROS topic) ----------
 function nextBuoyancy() {
+  if (eelDead()) return;
   const b = state.buoyancy ?? 0;
   const next = b > 0.05 ? "neutral" : b < -0.05 ? "positive" : "negative";   // + -> 0 -> - -> +
   backend.buoyancy(next);
 }
-$("buoy").addEventListener("click", nextBuoyancy);
+if (backend.features.current && backend.setCurrent) {                // the toolbar's Current button: water out of the wall outlets, on or off
+  $("current").style.display = "";
+  $("current").addEventListener("click", () => { const on = !jetsRunning(); backend.setCurrent(on); liveCfg.current = on; syncAddress(); });
+}
 
 // ---------- two on-screen joysticks (joy1, joy2): drag with the mouse; the sim publishes each as sensor_msgs/Joy ----------
 // Same convention as a real joy_node: axes[0] is LEFT/right with LEFT positive, axes[1] is up/down with UP positive.
@@ -857,22 +1010,38 @@ let userMoved = false;                     // once you orbit yourself, we stop a
 // Where the camera looks by default: the middle of the pool, backed off in proportion to its size (1 for the original 6 x 3 m pool).
 const poolCenter = () => new THREE.Vector3((bbox.x0 + bbox.x1) / 2, -0.4 * maxDepth, (bbox.z0 + bbox.z1) / 2);
 const poolScale = () => Math.sqrt((bbox.x1 - bbox.x0) * (bbox.z1 - bbox.z0) / 18);
+function overviewCamera() {                  // the whole pool in view, from a corner
+  controls.target.copy(poolCenter());
+  camera.position.set(-2.6, 2.4, 3.0).multiplyScalar(fitFactor() * poolScale()).add(controls.target);
+  controls.maxDistance = Math.max(16, 12 * fitFactor() * poolScale());        // (a big pool needs more room to back out)
+  controls.update();
+}
 function resetView() {
   setView("orbit");
   userMoved = false;
-  controls.target.copy(poolCenter());
-  camera.position.set(-2.6, 2.4, 3.0).multiplyScalar(fitFactor() * poolScale()).add(controls.target);
-  controls.update();
+  overviewCamera();
 }
 renderer.domElement.addEventListener("dblclick", resetView);
 let view = "orbit";
+/** The rectangle of the pool region the ROV is over (or the nearest one): the edges the Deck view's person stands at. */
+function deckRegion(x, z) {
+  const inR = regions.filter((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+  if (inR.length) return inR.reduce((a, b) => (b.d > a.d ? b : a));
+  const dist = (r) => Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
+  return regions.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+}
+const deck = { side: null, eye: new THREE.Vector3(), focus: new THREE.Vector3(), zoom: 1.0 };       // the Deck view: where the person stands and what they look at
+renderer.domElement.addEventListener("wheel", (e) => { if (view !== "deck") return; e.preventDefault(); deck.zoom = Math.max(0.35, Math.min(2.5, deck.zoom * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); }, { passive: false });
 function setView(v) {
+  const was = view;
   view = v;
   controls.enabled = v === "orbit";
+  if (v !== "deck" && camera.fov !== FOV0) { camera.fov = FOV0; camera.updateProjectionMatrix(); }
   document.querySelectorAll("[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
   const pc = poolCenter();
+  if (v === "deck") { deck.side = null; deck.eye.set(rov.position.x, 1.8, rov.position.z + 4); deck.focus.copy(rov.position); }        // (start where the ROV is: it then slides to the edge)
   if (v === "top") { camera.position.set(pc.x, 7.5 * fitFactor() * poolScale(), pc.z + 0.01); camera.lookAt(pc.x, 0, pc.z); }
-  if (v === "orbit") { controls.target.copy(pc); }
+  if (v === "orbit") { controls.target.copy(pc); if (was !== "orbit" && typeof overviewCamera === "function") { overviewCamera(); userMoved = false; } }       // coming back from Follow or Top: the whole pool again, not wherever the chase camera was
 }
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 let fxUser = fx;                      // what the Water FX button says; a low quality tier can switch it off without changing this
@@ -888,7 +1057,7 @@ $("reset").addEventListener("click", () => {
   backend.reset();
   held.clear(); clawCmd = 0; sendCommand();
 });
-setView(new URLSearchParams(location.search).get("view") || "orbit");   // e.g. /?view=follow
+setView(new URLSearchParams(location.search).get("view") || (cfg.mission !== "none" ? "deck" : "orbit"));   // e.g. /?view=follow (a mission starts on the deck)
 { const c = new URLSearchParams(location.search).get("cam");               // e.g. /?cam=6,-1,0
   const tg = new URLSearchParams(location.search).get("target");            // e.g. /?cam=..&target=-1,-1,0
   if (tg) controls.target.set(...tg.split(",").map(Number));
@@ -951,14 +1120,12 @@ function frame(now) {
   rov.position.set(shown.x, -shown.depth, -shown.y);
   rov.rotation.y = shown.yaw;
   wobble *= Math.exp(-dt * 1.6);
-  rov.rotation.x = 0.10 * wobble * Math.sin(t * 7);            // rocks after a splash or a bump
+  rov.rotation.x = shown.roll + 0.10 * wobble * Math.sin(t * 7);   // roll > 0 = the top goes to the right (a current pushing it over); rocks after a splash or a bump
   rov.rotation.z = -shown.pitch + 0.06 * wobble * Math.sin(t * 5.3 + 1);   // pitch > 0 = nose down (a hanging ring)
   rov.updateMatrixWorld(true);
   // spin props (visual speed ~ command)
-  left.userData.prop.rotation.y += -state.t1 * 40 * dt;
-  right.userData.prop.rotation.y += -state.t2 * 40 * dt;
-  vfront.userData.prop.rotation.y += -state.t3 * 40 * dt;
-  vrear.userData.prop.rotation.y += -state.t4 * 40 * dt;
+  syncRig();
+  for (const t of rig) t.node.userData.prop.rotation.y += -(state[t.name] || 0) * 40 * dt;
   // claw jaws swing outward to open (0 closed .. 0.7 rad open)
   for (const { jaw, sgn } of jaws) jaw.rotation.y = -sgn * shown.claw * 0.7;
 
@@ -968,11 +1135,8 @@ function frame(now) {
     clawCmd = clamp01(clawCmd + dClaw * 0.8 * dt);
     if (now - lastClawSend > 50) { lastClawSend = now; sendCommand(); }
   }
-  emit(bubbles.t1, left, ex, state.t1, dt);
-  emit(bubbles.t2, right, ex, state.t2, dt);
-  emit(bubbles.t3, vfront, ey, state.t3, dt);
-  emit(bubbles.t4, vrear, ey, state.t4, dt);
-  for (const k of bars) stepBubbles(bubbles[k], dt);
+  for (const t of rig) emit(bubbles[t.name], t.node, t.axis, state[t.name] || 0, dt);
+  for (const k in bubbles) stepBubbles(bubbles[k], dt);
 
   const floorD = floorAt(rov.position.x, rov.position.z);
   shadow.position.set(rov.position.x, -floorD + 0.01, rov.position.z);
@@ -988,13 +1152,30 @@ function frame(now) {
   stepSilt(dt);
   if (props) props.update(state.props, dt);
   if (fish) fish.update(state.props, dt, t);
+  if (crabs) crabs.update(state.props, dt, t);
+  if (eels) eels.update(state.props, dt, t, rov);
+  if (missionHud) missionHud.update(state);
+  if (missionView) missionView.update(state.props, dt, t, floorAt);
+  { const eel = eelProp(); if (eel && eel.zap) wobble = Math.max(wobble, 0.9); }        
+  if (jets) jets.update(state.props, dt);
   for (const m of solids) {                          // x-ray: fade what is between us and the pool
     const mat = m.material, target = m.userData.hidesWhen(camera.position) ? 0.14 : 1;
     mat.opacity += (target - mat.opacity) * (1 - Math.exp(-dt * 8));
     mat.depthWrite = mat.opacity > 0.98;
   }
 
-  if (view === "follow") {
+  if (view === "deck") {                                  // a person on the deck at the pool's edge, looking down at the ROV and at what its nose is working on
+    const rect = deckRegion(rov.position.x, rov.position.z);                                                       // the water's edges where the ROV is (not the stairs sticking out of the wall)
+    deck.side = nearestSide(rect, { x: rov.position.x, z: rov.position.z }, deck.side);
+    const eye = deckEye(rect, deck.side, rov.position).eye;                                                       // standing outside the wall, leaning out over the water as far as it takes to see the ROV
+    const ahead = new THREE.Vector3(0.35, -0.12, 0).applyAxisAngle(ey, shown.yaw);                                 // look a little ahead of the ROV: that is where the nose works
+    deck.focus.lerp(want.copy(rov.position).add(ahead), 1 - Math.exp(-dt * 4));
+    deck.eye.lerp(want.set(...eye), 1 - Math.exp(-dt * 2.5));
+    camera.position.copy(deck.eye);
+    camera.lookAt(deck.focus);
+    const d = camera.position.distanceTo(deck.focus), fov = Math.max(14, Math.min(50, 2 * Math.atan(1.3 * deck.zoom / d) * 180 / Math.PI));   // about 2.6 m across at the ROV, whatever the distance
+    if (Math.abs(fov - camera.fov) > 0.1) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  } else if (view === "follow") {
     off.set(-1.25, 0.55, 0).applyAxisAngle(ey, shown.yaw);
     want.copy(rov.position).add(off);
     camera.position.lerp(want, 1 - Math.exp(-dt * 4));
@@ -1117,8 +1298,8 @@ function applyTier(t) {
   tier = t;
   const T = TIERS[t];
   setFx(T.fx ? fxUser : false, false);
-  camEvery = T.cam; maxPR = T.pr;
-  $("cam").style.display = T.cam ? "" : "none";
+  camEvery = cfg.camera ? T.cam : 0; maxPR = T.pr;                       // no camera on this ROV (?camera=off): never draw its picture
+  $("cam").style.display = camEvery ? "" : "none";
   winStart = 0; graceUntil = performance.now() + 1500;          // let shaders compile before measuring again
   $("quality").textContent = qualityMode === "auto" ? `Quality: Auto (${T.name})` : `Quality: ${T.name}`;
   onResize();
@@ -1154,18 +1335,144 @@ if (new URLSearchParams(location.search).has("selftest")) {
   (async () => {
     await wait(1500);
     if (!lastMsg) return fail("no state from the sim");
-    const x0 = state.x;
+    const x0 = state.x, y0 = state.y;
     backend.cmd({ t1: 0.8, t2: 0.8, t3: 0, t4: 0, claw: 0 });
     await wait(2500);
-    if (!(state.x > x0 + 0.3)) return fail(`did not drive forward (${x0.toFixed(2)} -> ${state.x.toFixed(2)})`);
+    if (!(Math.hypot(state.x - x0, state.y - y0) > 0.08)) return fail(`did not drive forward (${x0.toFixed(2)} -> ${state.x.toFixed(2)})`);        // (a mission starts the ROV facing the other way)
     const d1 = state.depth;
     backend.cmd({ t1: 0, t2: 0, t3: -0.8, t4: -0.8, claw: 0 });
     await wait(2500);
     if (!(state.depth > d1 + 0.2)) return fail(`did not dive (${d1.toFixed(2)} -> ${state.depth.toFixed(2)})`);
     backend.cmd({ t1: 0, t2: 0, t3: 0, t4: 0, claw: 0 });
     if (backend.features.fish && !(state.props || []).some((p) => p.type === "fish")) return fail("no fish in the state");
+    if (backend.features.rings) {                       // the N key: point at the water, press N, a ring appears and sinks
+      const ringsNow = () => (state.props || []).filter((p) => p.type === "ring");
+      const before = ringsNow().length;
+      const c = new THREE.Vector3((bbox.x0 + bbox.x1) / 2, 0, (bbox.z0 + bbox.z1) / 2).project(camera);       // the middle of the pool on screen
+      renderer.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: (c.x + 1) / 2 * innerWidth, clientY: (1 - c.y) / 2 * innerHeight, bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyN", bubbles: true }));
+      await wait(700);
+      if (before < MAX_RINGS && ringsNow().length !== before + 1) return fail(`N did not drop a ring (${before} -> ${ringsNow().length}; ${$("toast").textContent})`);
+      if (before < MAX_RINGS) {
+        const mine = ringsNow().at(-1), d0 = mine.depth;
+        await wait(1500);
+        const d1 = ringsNow().at(-1).depth;
+        if (!(d1 > d0 + 0.05)) return fail(`the dropped ring does not sink (${d0.toFixed(2)} -> ${d1.toFixed(2)})`);
+      }
+    }
+    if (backend.setThrusters) {                                       // the Config dialog's thruster modes: the model, the bars and the keys follow the layout
+      for (const n of [3, 6, 8, 4]) {
+        backend.setThrusters(n);
+        for (let k = 0; k < 40 && state.thrusters !== n; k++) await wait(100);   // (the new layout arrives with the next state)
+        syncRig(); updateHud();                                                    // (a slow computer draws frames late: do not wait for one)
+        if (rig.length !== n || thrusterGroup.children.length < n) return fail(`${n} thrusters: the model has ${rig.length} (state ${state.thrusters}, layout ${(state.layout || []).length}, rov ${(window.__rov || {}).thrusters})`);
+        if ($("thrusters").querySelectorAll(".bar").length !== n) return fail(`${n} thrusters: the HUD has ${$("thrusters").querySelectorAll(".bar").length} bars`);
+        backend.reset(); await wait(300);                                         // (back at the start, away from the wall)
+        const x1 = state.x, y1 = state.y;
+        backend.cmd(computeCommand(new Set(["KeyW"]), [0, 0, 0], 0, { thrusters: n }));
+        await wait(1200);
+        backend.cmd(computeCommand(new Set(), [0, 0, 0], 0, { thrusters: n }));
+        if (!(Math.hypot(state.x - x1, state.y - y1) > 0.05)) return fail(`${n} thrusters: W did not drive forward (${x1.toFixed(2)} -> ${state.x.toFixed(2)})`);
+      }
+    }
+    if (backend.features.eel) {
+      backend.reset(); await wait(300);
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyL", bubbles: true }));
+      for (let k = 0; k < 600 && !eelDead(); k++) await wait(100);
+      if (!eelDead()) return fail("the eel never got to the ROV");
+      await wait(300);
+      const x1 = state.x;
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", bubbles: true }));
+      await wait(800);
+      if (Math.abs(state.x - x1) > 0.05 || state.t1 !== 0) return fail(`the stunned ROV still answers the keys (${x1.toFixed(2)} -> ${state.x.toFixed(2)}, t1 ${state.t1})`);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW", bubbles: true }));
+      for (let k = 0; k < 200 && eelDead(); k++) await wait(100);
+      if (eelDead()) return fail("the ROV never woke up again");
+    }
+    if (backend.features.mission) {                                    // a mission: its panel, the props drawn, the board
+      for (let k = 0; k < 60 && !(missionView && missionHud && missionView.items.size >= 8); k++) await wait(100);
+      const mp = (state.props || []).find((p) => p.type === "mission");
+      if (!document.getElementById("mission") || !mp || mp.board.items.length < 10) return fail("the mission panel or its state is missing");
+      if (!missionView || missionView.items.size < 8) return fail(`the mission props are not drawn (${missionView ? missionView.items.size : 0})`);
+    }
+    if (backend.setPoolSize && jets && jets.sys) {                    // the drawn outlets must follow the wall when the pool is resized
+      for (const [L, W, D] of [[1, 3, 4], [2, 2, 6], [1, 1, 2]]) {            // (length, width, depth)
+        backend.setPoolSize(L, W, D);
+        const drawnRight = () => { const os = state.props.find((p) => p.type === "jets").outlets; return !!jets.sys && os.every((o, k) => Math.hypot(jets.sys[k].origin.x - o.x, jets.sys[k].origin.y + o.depth, jets.sys[k].origin.z + o.y) < 1e-6); };
+        for (let k = 0; k < 40 && !drawnRight(); k++) await wait(100);       // (a slow computer draws the new outlets a little later)
+        const outlets = state.props.find((p) => p.type === "jets").outlets;
+        if (!jets.sys) return fail("the outlets were not drawn after the pool was resized");
+        for (let k = 0; k < outlets.length; k++) {
+          const o = outlets[k], d = jets.sys[k].origin;                // the drawn outlet (three.js: x, -depth, -y)
+          if (Math.hypot(d.x - o.x, d.y + o.depth, d.z + o.y) > 1e-6) return fail(`${L}x${W}: the outlet is drawn at (${d.x.toFixed(2)}, ${(-d.y).toFixed(2)}, ${(-d.z).toFixed(2)}) but sits at (${o.x.toFixed(2)}, ${o.depth.toFixed(2)}, ${o.y.toFixed(2)})`);
+        }
+      }
+    }
+    {                                                                  // the Config dialog: the "right now" settings must really change things
+      const q = (id) => document.getElementById(id), wantTool = tool === "nose" ? "claw" : "nose";
+      const choose = (el, v) => { el.value = v; el.dispatchEvent(new Event("change", { bubbles: true })); };
+      $("config").click();
+      await wait(300);
+      if (!q("configui")) return fail("the Config button did not open the dialog");
+      const radio = document.querySelector(`#configui input[name="cfg-tool"][value="${wantTool}"]`);
+      if (radio && !radio.disabled) {                                  // the tool
+        radio.click(); await wait(400);
+        if (state.tool !== wantTool) return fail(`the dialog's tool choice did not change the tool (${state.tool}, wanted ${wantTool})`);
+        document.querySelector(`#configui input[name="cfg-tool"][value="${wantTool === "nose" ? "claw" : "nose"}"]`).click(); await wait(400);
+      }
+      if (!q("cfg-pool").disabled) {                                   // the pool size
+        choose(q("cfg-pool"), "1x2"); await wait(500);
+        const m = state.regions.reduce((a, b) => (b[4] > a[4] ? b : a));
+        if (m[3] - m[2] !== 6) return fail(`the dialog's pool size did not resize the pool (${m[3] - m[2]} m wide, wanted 6)`);
+        choose(q("cfg-pool"), "1x1"); await wait(500);
+      }
+      if (!q("cfg-current").disabled) {                                // the water
+        q("cfg-current").click(); await wait(400);
+        const on = () => state.props.some((p) => p.type === "jets" && p.on);
+        if (!on()) return fail("the dialog's Run the water box did not start the water");
+        q("cfg-current").click(); await wait(400);
+        if (on()) return fail("unticking Run the water did not stop it");
+      }
+      if (jets && !q("cfg-flow").disabled) {                           // how it is drawn
+        choose(q("cfg-flow"), "streaks"); await wait(200);
+        if (jets.look !== "streaks") return fail(`the dialog's water look did not change it (${jets.look})`);
+        choose(q("cfg-flow"), "mix"); await wait(100);
+      }
+      q("cfg-close").click(); await wait(100);
+      if (q("configui")) return fail("the dialog did not close");
+    }
     document.title = `PASS (${backend.name}, tool ${tool}, quality ${TIERS[tier].name}, ${lastFps ? lastFps.toFixed(0) + " fps" : "fps not measured"})`;
   })();
 }
+
+window.__rov = { state, backend, camera, controls, jets: () => jets, rings: () => (state.props || []).filter((p) => p.type === "ring") };      // read-only hook for automatic checks (see devtools-driven tests)
+
+// ---------- ?config: a panel to set all of these and make the link ----------
+// The Config dialog (configui.js): the toolbar's Config button, or ?config. The "right now" settings (tool, water, pool size, thruster power) are changed through `live`.
+const liveCfg = { ...cfg };                                     // the page's settings as they are NOW (the address is kept in step with them)
+const mainPoolSize = () => { const m = regions.reduce((a, b) => (b.d > a.d ? b : a)); return [Math.round((m.x1 - m.x0) / 6), Math.round((m.z1 - m.z0) / 3), m.d]; };
+const jetsRunning = () => (state.props || []).some((p) => p.type === "jets" && p.on);
+function syncAddress() {                                         // a reload or a shared link then keeps these settings
+  const sp = new URLSearchParams(toQuery(liveCfg, location.search));
+  if (tool !== (backend.defaultTool || "claw")) sp.set("tool", tool); else sp.delete("tool");
+  const q = sp.toString();
+  try { history.replaceState(null, "", location.pathname + (q ? "?" + q : "")); } catch (e) { /* the address is only a convenience */ }
+}
+const live = {
+  tool: { get: () => tool, set: (t) => { if (t === "nose" || backend.features.claw) setTool(t); } },
+  current: backend.features.current && backend.setCurrent ? { get: jetsRunning, set: (on) => backend.setCurrent(on) } : null,
+  flow: { get: () => (jets ? jets.look : liveCfg.flow), set: (v) => { if (jets) jets.setLook(v); } },
+  pool: backend.setPoolSize ? { get: mainPoolSize, set: (L, W, D) => { backend.setPoolSize(L, W, D); userMoved = false; } } : null,   // (puts everything back at the start; the camera refits)
+  buoyancy: { get: () => { const b = state.buoyancy ?? 0; return b > 0.05 ? "positive" : b < -0.05 ? "negative" : "neutral"; }, set: (m) => backend.buoyancy(m) },
+  speed: backend.setSpeed ? { get: () => liveCfg.speed, set: (v) => backend.setSpeed(v) } : null,
+  thrusters: backend.setThrusters ? { get: () => state.thrusters || 4, set: (n) => backend.setThrusters(n) } : null,
+  changed: (c) => { for (const k of ["current", "flow", "speed", "thrusters", "poollength", "poolwidth", "pooldepth"]) liveCfg[k] = c[k]; syncAddress(); },
+};
+async function openConfig() {
+  try { (await import("./configui.js")).showConfig({ cfg: liveCfg, configurable: backend.configurable || {}, live }); }
+  catch (e) { console.warn("config dialog failed:", e); }
+}
+$("config").addEventListener("click", openConfig);
+if (cfg.open) openConfig();
 
 requestAnimationFrame(frame);

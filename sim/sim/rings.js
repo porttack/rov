@@ -4,6 +4,7 @@
 // (grips; open again to let go); BUMPING with any solid part of the ROV (pushed, spun by where it was hit, coasts to a stop).
 // Game-style physics, not a solver: capsule-vs-hoop overlap tests, resolved by moving the light ring. Python is the reference.
 import { POOL_MAX_DEPTH, POOL_REGIONS, clamp, floorAt, nearestIn } from "./physics.js";
+import { MAX_RINGS } from "../config.js";
 import { JAW_HALF, JAW_SWING, JAW_X0, JAW_Y0, JAW_Z, NOSE_PTS, NOSE_R, capsules, segSeg } from "./shape.js";
 
 /** Angle difference wrapped into (-pi/2, pi/2]: a ring looks the same turned by 180 degrees. (Python's % is never negative.) */
@@ -53,6 +54,7 @@ export class Ring {
     [this.x, this.y, this.yaw] = this.start;
     this.vx = this.vy = this.wz = 0.0;
     this.depth = this.floor;
+    if (this.intro) { this.depth = Ring.R + Ring.TUBE + 0.05; this.sink_speed = this.intro; }   // start up: just below the surface, sinking within a few seconds
     this.held = false; this.hooked = false; this.lifting = false; this.in_jaws = false;
     this.prev_claw = 0.0;
     this.rel = [0.0, 0.0, 0.0, 0.0];
@@ -74,7 +76,7 @@ export class Ring {
       }
     } else {
       this.in_jaws = rov.tool === "claw" && rov.claw_holder === null && this._betweenJaws(rov, c, s);
-      this.depth = Math.min(this.floor, this.depth + Ring.SINK * dt);
+      this.depth = Math.min(this.floor, this.depth + (this.sink_speed ?? Ring.SINK) * dt);
       if (rov.tool === "nose") {
         this._nose(rov, c, s, dt);
       } else if (this.in_jaws && rov.claw_target <= Ring.CLAMP_COMMAND && rov.claw < this.prev_claw - 1e-4) {
@@ -93,7 +95,7 @@ export class Ring {
     else this._coast(dt);
     if (!this.held) {
       this._collide(rov, dt);
-      for (const other of this.others) if (other !== this) this._collideRing(other);
+      for (const other of this.others) if (other !== this && rov.props.includes(other)) this._collideRing(other);   // (a ring removed by Reset is skipped)
     }
     for (let i = 0; i < 3; i++) {                        // keep both ends of the hoop inside the pool
       let worst = null;
@@ -297,11 +299,30 @@ export const RING_STARTS = [
   [2.3, -0.9, Math.PI / 2 - 0.3, 0xff4d88],      // pink
 ];
 
-/** Put n rings (0 to 5) in the pool. */
-export function addTo(rov, n = 3) {
+export { MAX_RINGS };
+
+/** Drop a NEW ring into the water at (x, y): it starts at the surface and sinks to the floor. Returns the ring, or null when the pool already has
+ *  MAX_RINGS. It is "transient": Reset removes it again (the pool goes back to how it started). `random` is for tests. */
+export function dropRing(rov, x, y, random = Math.random) {
+  const rings = rov.props.filter((p) => p.type === "ring");
+  if (rings.length >= MAX_RINGS) return null;
+  const others = rings.length ? rings[0].others : [];            // one shared list, so every ring knows every other ring
+  [x, y] = nearestIn(POOL_REGIONS, x, y);                         // inside the pool, whatever was asked for
+  const ring = new Ring(x, y, random() * Math.PI, RING_STARTS[rings.length % RING_STARTS.length][3], others);
+  ring.depth = Ring.R + Ring.TUBE;                                // the top of the hoop just at the surface
+  ring.transient = true;
+  others.push(ring);
+  rov.props.push(ring);
+  return ring;
+}
+
+/** Put n rings (0 to 5) in the pool. `intro`: they start just under the surface and sink in the first seconds (each a little differently fast), also after Reset. */
+export function addTo(rov, n = 3, { intro = false } = {}) {
   const rings = [];
   for (const [x, y, yaw, color] of RING_STARTS.slice(0, Math.max(0, Math.min(Math.trunc(n), RING_STARTS.length)))) {
-    rings.push(new Ring(x, y, yaw, color, rings));
+    const ring = new Ring(x, y, yaw, color, rings);
+    if (intro) { ring.intro = 0.4 + 0.06 * rings.length; ring.reset(); }       // (the browser: the rings start just under the surface and sink; sinks at 0.4 m/s and up)
+    rings.push(ring);
   }
   rov.props.push(...rings);
 }

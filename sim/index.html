@@ -82,6 +82,10 @@
   button { background: #1d6f9f; color: #fff; border: 0; border-radius: 6px;
            padding: 5px 10px; font: inherit; cursor: pointer; }
   button.on { background: #f2b705; color: #111; }
+  /* ?controls=h-hidden: only the switch box (and the camera window) are left */
+  body.bare #btns, body.bare #hud, body.bare #keyhelp, body.bare #topics, body.bare #seriallog, body.bare #hmode, body.bare #joys { display: none !important; }
+  #toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 40; max-width: min(90vw, 28rem); text-align: center;
+           background: rgba(8, 30, 50, .9); color: #fff; padding: 8px 14px; border-radius: 8px; pointer-events: none; }
   button.off { opacity: .55; }
   a.btnlink { background: #1d6f9f; color: #fff; border-radius: 6px; padding: 5px 10px; text-decoration: none; cursor: pointer; }
   a.btnlink:hover { filter: brightness(1.15); }
@@ -95,15 +99,14 @@
 <body>
 <div id="hud" class="panel">
   <h1><span id="dot"></span><span id="status">waiting for sim...</span></h1>
-  <div class="row"><span class="lbl">t1 left</span><div class="bar"><b></b><i id="b-t1"></i></div><span class="num" id="n-t1">0.00</span></div>
-  <div class="row"><span class="lbl">t2 right</span><div class="bar"><b></b><i id="b-t2"></i></div><span class="num" id="n-t2">0.00</span></div>
-  <div class="row"><span class="lbl">t3 front</span><div class="bar"><b></b><i id="b-t3"></i></div><span class="num" id="n-t3">0.00</span></div>
-  <div class="row"><span class="lbl">t4 rear</span><div class="bar"><b></b><i id="b-t4"></i></div><span class="num" id="n-t4">0.00</span></div>
+  <div id="thrusters"></div>                       <!-- one bar per thruster, built by app.js from the layout (3, 4, 6 or 8) -->
   <div class="row"><span class="lbl">tool</span><span id="claw">closed</span></div>
   <div class="row"><span class="lbl">depth</span><span id="depth">0.00 m</span></div>
   <div class="row"><span class="lbl">heading</span><span id="heading">0&deg;</span></div>
+  <div class="row" id="row-current" style="display:none"><span class="lbl">current</span><span id="currentv">0.00 m/s</span></div>
   <div class="imu">
     <div class="row"><span class="lbl">tilt</span><svg width="40" height="20" viewBox="0 0 40 20"><g id="tilt"><line x1="4" y1="10" x2="36" y2="10" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="36" cy="10" r="3" fill="#f2b705"/></g></svg><span id="pitch">level</span></div>
+    <div class="row"><span class="lbl">roll</span><span id="rollv">level</span></div>
     <div class="row"><span class="lbl">accel</span><span id="accel">+0.000 +0.000 +9.810</span></div>
     <div class="row"><span class="lbl">minus g</span><span id="accel0">+0.000 +0.000 +0.000</span></div>
     <div class="row"><span class="lbl">gyro</span><span id="gyro">+0.000 +0.000 +0.000</span></div>
@@ -112,7 +115,7 @@
   </div>
 </div>
 <div id="rightcol">
-<div id="switchbox" class="panel" title="Three momentary switches, like a scout ROV controller. Red = the left thruster (keys 1 and 2), green = the right thruster (arrow keys left / right), bottom = both up/down thrusters (arrow keys up / down). Click and hold with the mouse, or use the keys.">
+<div id="switchbox" class="panel">
   <div class="swrow">
     <div class="sw red" data-i="0"><div class="swname">red</div><div class="swslot h"><span class="swend l">1</span><div class="swlever"></div><span class="swend r">2</span></div></div>
     <div class="sw green" data-i="1"><div class="swname">green</div><div class="swslot h"><div class="swlever"></div></div></div>
@@ -120,7 +123,7 @@
   <div class="swrow">
     <div class="sw" data-i="2"><div class="swname">up / down</div><div class="swslot"><div class="swlever"></div></div></div>
   </div>
-  <div id="hmode" class="hmode" role="button" title="H key. On: only these three switches work, like the real controller (full power, no mixing). Off: the extra keys (W A S D, R F, Z C, I K) work too.">all keys</div>
+  <div id="hmode" class="hmode" role="button">all keys</div>
 </div>
 <div id="joys">
   <div class="panel joy" title="joy1: drag with the mouse. Publishes sensor_msgs/Joy on /sim/joy1 (axes[0] left +, axes[1] up +)">
@@ -136,30 +139,36 @@
 </div>
 <div id="btns" class="panel">
   <button data-view="orbit" class="on">Orbit</button>
+  <button data-view="deck" title="Stand on the deck at the edge of the pool, looking down at the ROV and what it is working on (wheel: zoom)">Deck</button>
   <button data-view="follow">Follow</button>
   <button data-view="top">Top</button>
-  <button id="buoy" title="Pool setting: ROV floats / neutral (hovers) / sinks (B)">Buoyancy: floats</button>
-  <button id="tool" title="Front tool: claw or fixed nose (T)">Tool: Claw</button>
+  <button id="current" style="display:none" title="Run water out of the two outlets in the side wall: a current that pushes and tilts the ROV">Current: off</button>
   <button id="fx" title="Refraction + water ripples (experimental)">Water FX</button>
   <button id="serial" style="display:none" title="Drive the ROV from a micro:bit or Pico (the Help page has the protocol)">Connect micro:bit / Pico</button>
   <button id="quality" title="Auto lowers the graphics if the page runs slowly; click to pin High or Low">Quality: Auto</button>
   <button id="reset">Reset</button>
+  <button id="config" title="Change the tool, the water, the pool size and more">Config</button>
   <a id="help" class="btnlink" href="help.html" target="_blank" rel="noopener" title="How it works: the controls, the pool, and the micro:bit / Pico protocol">Help</a>
 </div>
 <pre id="seriallog" class="panel" style="display:none; right: 8px; bottom: 8px; margin: 0; font: 11px/1.4 ui-monospace, Menlo, monospace; max-width: 300px; white-space: pre-wrap;"></pre>
+<div id="toast" role="status" style="display:none"></div>
 <div id="keyhelp" class="panel" style="display:none; bottom: 8px; left: 8px; font: 12px/1.5 ui-monospace, Menlo, monospace;">
   <div style="font: 600 12px -apple-system, system-ui, sans-serif">Keyboard (click the page first)</div>
   <div>Switch box: &nbsp;1 / 2 red &nbsp;&nbsp;&larr; / &rarr; green &nbsp;&nbsp;&darr; / &uarr; down / up</div>
-  <div class="nonh">W/S forward / reverse &nbsp;&nbsp;A/D turn &nbsp;&nbsp;R/Space up &nbsp;&nbsp;F/Shift down</div>
-  <div class="nonh">I/K nose up/down &nbsp;&nbsp;Z / C one thruster only</div>
+  <div class="nonh">W/Shift forward &nbsp;&nbsp;S/Space reverse &nbsp;&nbsp;A/D turn &nbsp;&nbsp;R/F up/down</div>
+  <div class="nonh">I/K nose up/down &nbsp;&nbsp;Z / C one side only</div>
+  <div class="nonh" id="help-t6">Q / E slide left / right</div>
+  <div class="nonh" id="help-t8">U / O roll left / right</div>
   <div>H: H-bridge only (just the switch box) &nbsp;&nbsp;X stop all</div>
+  <div id="help-ring">N drop a new ring where the mouse is</div>
+  <div id="help-jets">J change how the running water is drawn</div>
   <div id="help-claw">[ ] claw closer / wider</div>
   <div id="help-tool">T claw/nose &nbsp;&nbsp;B buoyancy &nbsp;&nbsp;V reset view (or double-click)</div>
 </div>
 </div>
 <div id="topics" class="panel">
   <div class="h">Send commands to:</div>
-  <div>/sim/t1 .. /sim/t4 &nbsp;Float32 -1..1</div>
+  <div>/sim/t1 .. /sim/t4 (to t8) &nbsp;Float32 -1..1</div>
   <div>/sim/claw &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Float32 0 closed .. 1 open</div>
   <div class="h" style="margin-top:3px">Read from:</div>
   <div>/sim/imu &nbsp;/sim/depth &nbsp;/sim/heading</div>

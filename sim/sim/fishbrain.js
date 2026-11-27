@@ -3,13 +3,13 @@
 // WHAT IT DOES: wander (lazy swimming), route (thread a pool ring), peek (come and look into the camera of a ROV that sits still),
 // flee (bolt away, planned in 3D). It is never caught: it flees early, is faster than the ROV, and a hard rule keeps it 30 cm from
 // the ROV's surface. See the header of rov_fish.py for the full story. Python is the reference; keep the two in step.
-import { POOL_MAX_DEPTH, POOL_REGIONS, clamp, nearestIn } from "./physics.js";
+import { POOL_MAX_DEPTH, POOL_WATER, clamp, nearestIn } from "./physics.js";
 import { CAM_POS, CAM_TILT, distanceToRov, localToWorld } from "./shape.js";
 import { Rng } from "./rng.js";
 
 const wrapPi = (a) => ((((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;   // Python's % (always >= 0)
 const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const maxRegion = () => POOL_REGIONS.reduce((a, b) => (b[4] > a[4] ? b : a));
+const maxRegion = () => POOL_WATER.reduce((a, b) => (b[4] > a[4] ? b : a));
 const inRect = (r, x, y) => r[0] <= x && x <= r[1] && r[2] <= y && y <= r[3];
 
 export class Fish {
@@ -22,6 +22,8 @@ export class Fish {
   static PEEK_FOR = [8.0, 16.0];
   static PEEK_COOLDOWN = [8.0, 20.0];
   static PEEK_SPEED = 0.55;
+  static FLOW_PUSH = 0.45;                          // a current (the water jets, current.js) carries the fish along by this fraction of the water's speed:
+                                                    // it swims against it a little, but a strong stream still shoves it about
   static REACTION = 0.0;
   // --- swimming ---
   static CRUISE = [0.15, 0.35];
@@ -35,6 +37,7 @@ export class Fish {
     this.type = "fish";
     this.seed = seed;
     this.color = color;
+    this.peeks = true;               // false when the ROV has no camera (page option ?camera=off): nothing to come and look into
     this.reset();
   }
 
@@ -71,7 +74,7 @@ export class Fish {
 
   // ------------------------------------------------------------------ helpers
   _openRegions(depth) {
-    const regs = POOL_REGIONS.filter((r) => r[4] - this.dm >= depth);
+    const regs = POOL_WATER.filter((r) => r[4] - this.dm >= depth);
     return regs.length ? regs : [maxRegion()];
   }
   _floorHere(x, y, regions = null) {
@@ -88,7 +91,7 @@ export class Fish {
   }
   _randomSpot() {
     const W = Fish.WANDER_MARGIN;
-    const regs = POOL_REGIONS.filter((r) => r[1] - r[0] > 2 * W && r[3] - r[2] > 2 * W && r[4] > 0.9);
+    const regs = POOL_WATER.filter((r) => r[1] - r[0] > 2 * W && r[3] - r[2] > 2 * W && r[4] > 0.9);
     const weights = regs.map((r) => (r[1] - r[0]) * (r[3] - r[2]));
     const r = this.rng.weighted(regs, weights);
     return [this.rng.uniform(r[0] + W, r[1] - W), this.rng.uniform(r[2] + W, r[3] - W), this.rng.uniform(0.4, r[4] - 0.4)];
@@ -168,6 +171,7 @@ export class Fish {
   }
 
   _startPeek(rov) {
+    if (!this.peeks) return false;
     const local = this._choosePeekSpot(rov);
     if (local === null) return false;
     this.mode = "peek";
@@ -349,6 +353,10 @@ export class Fish {
     this.x += hv * Math.cos(this.yaw) * dt;
     this.y += hv * Math.sin(this.yaw) * dt;
     this.depth += this.speed * Math.sin(this.pitch) * dt;
+    if (typeof rov._flowAt === "function") {                // the water itself may be moving: a stream shoves the fish a bit
+      const [wx, wy, wd] = rov._flowAt(this.x, this.y, this.depth);
+      this.x += wx * F.FLOW_PUSH * dt; this.y += wy * F.FLOW_PUSH * dt; this.depth += wd * F.FLOW_PUSH * dt;
+    }
     const bumped = this._keepInWater();
     this.pinned_t = bumped && flee ? this.pinned_t + dt : 0.0;
     if (bumped && this.mode === "wander") this.target = null;
