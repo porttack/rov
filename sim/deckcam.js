@@ -17,9 +17,10 @@ export function deckEye(rect, side, pos) {
     : side === 2 ? [along(pos.x, rect.x0, rect.x1), H, rect.z0 - outside] : [along(pos.x, rect.x0, rect.x1), H, rect.z1 + outside];
   return { eye, outside, height: H, wall_distance: w };
 }
-/** The edge nearest the ROV (with some stickiness: stay on `current` unless another is more than `hyst` metres nearer). */
-export function nearestSide(rect, pos, current = null, hyst = 1.0) {
+/** The edge nearest the ROV (with some stickiness: stay on `current` unless another is more than `hyst` metres nearer; `home`: a side that counts as `homeBonus` metres nearer). */
+export function nearestSide(rect, pos, current = null, hyst = 1.0, home = null, homeBonus = 1.5) {
   const d = [pos.x - rect.x0, rect.x1 - pos.x, pos.z - rect.z0, rect.z1 - pos.z];
+  if (home !== null) d[home] -= homeBonus;                                      // a mission has a favourite wall (the one with the stairs): stand there unless the ROV is much nearer another
   let best = 0; for (let i = 1; i < 4; i++) if (d[i] < d[best]) best = i;
   return current === null || d[best] < d[current] - hyst ? best : current;
 }

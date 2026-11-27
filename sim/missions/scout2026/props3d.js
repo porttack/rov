@@ -1,10 +1,12 @@
 // props3d.js — draws the 2026 SCOUT props from their state (the page loads it only for ?mission=scout2026; delete web/missions/ to remove). three.js axes: x ahead, y up, z = -sim y.
 // Items are built once (a group whose origin is the middle of the prop's BASE) and moved with the state. Sizes follow the prop building instructions.
 import { PVC_R, pipe, standard } from "../common/view3d.js";
+import { PLAQUES, PLAQUE_ACROSS, PLAQUE_ALONG, snapPlaque } from "./plaques.js";
+import { at } from "./layout.js";
 
 export class MissionView {
   constructor(scene, THREE) {
-    this.scene = scene; this.T = THREE; this.items = new Map(); this.transect = null; this.iceberg = null; this.stand = null; this.way = null; this.oil = null; this.pot = null; this.zone = null; this.obs = null; this.cables = new Map(); this.deck = null;
+    this.scene = scene; this.T = THREE; this.items = new Map(); this.transect = null; this.labelsOn = false; this.plaques = null; this.iceberg = null; this.stand = null; this.way = null; this.oil = null; this.pot = null; this.zone = null; this.obs = null; this.cables = new Map(); this.deck = null;
     this.white = standard(THREE, 0xf2f2ec); this.glow = new THREE.MeshStandardMaterial({ color: 0x31d46b, emissive: 0x0a4a22, roughness: 0.5 });
   }
 
@@ -203,6 +205,33 @@ export class MissionView {
     return g;
   }
 
+  // ---- the plaques on the pool floor (key P): task number, the prop, what to do, and the real-world thing; two floor tiles each, fixed in place
+  makePlaque(p) {
+    const T = this.T, c = document.createElement("canvas"); c.width = 768; c.height = 384;
+    const g = c.getContext("2d");
+    g.fillStyle = "#0d3b4f"; g.fillRect(0, 0, 768, 384); g.strokeStyle = "#f2c500"; g.lineWidth = 10; g.strokeRect(8, 8, 752, 368);
+    const wrap = (text, x, y, maxW, lh, font, color) => {
+      g.font = font; g.fillStyle = color; let line = "";
+      for (const w of text.split(" ")) { const t = line ? line + " " + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = t; }
+      g.fillText(line, x, y); return y + lh;
+    };
+    g.textBaseline = "top";
+    g.font = "bold 54px system-ui, sans-serif"; g.fillStyle = "#f2c500"; g.fillText(`TASK ${p.task}`, 32, 26);
+    g.font = "bold 50px system-ui, sans-serif"; g.fillStyle = "#ffffff"; g.fillText(p.title, 32, 92);
+    let y = wrap(p.text, 32, 164, 704, 42, "36px system-ui, sans-serif", "#e8f6ff");
+    wrap(p.real, 32, y + 8, 704, 36, "italic 30px system-ui, sans-serif", "#a9d6e8");
+    const tex = new T.CanvasTexture(c); tex.anisotropy = 4;
+    const m = new T.Mesh(new T.PlaneGeometry(PLAQUE_ALONG, PLAQUE_ACROSS).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.96, side: T.DoubleSide }));
+    m.rotation.y = Math.PI / 2;                                  // fixed: text running along the pool's width, its top pointing away from the wall
+    return m;
+  }
+  setLabels(on, floorAt = () => 3) {
+    this.labelsOn = on;
+    if (on && !this.plaques) {
+      this.plaques = PLAQUES.map((p) => { const mesh = this.makePlaque(p), [x, y] = snapPlaque(...at(...p.spot)); mesh.position.set(x, -floorAt(x, -y) + 0.02, -y); this.scene.add(mesh); return mesh; });
+    }
+    for (const m of this.plaques || []) m.visible = on;
+  }
   update(list, dt, t, floorAt = () => 3) {
     const m = (list || []).find((p) => p.type === "mission");
     if (m && m.deck && !this.deck) this.deck = this.buildDeck(m);

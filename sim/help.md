@@ -11,7 +11,7 @@ and say hello to the fish. It runs entirely in your browser. You can also drive 
 
 ## Driving {#driving}
 
-The **switch box** (top right) imitates the controller most scout ROVs use: three momentary switches that each give full reverse, off, or full forward.
+The **switch box** (top right) imitates the controller most scout ROVs use: three momentary switches that each give full reverse, off, or full forward. The levers **follow the commands the sim really has**, whoever sent them (the page, ROS, or a micro:bit over USB): forward, stop or reverse, never half way (a partial command shows the direction it pushes).
 Let go and a switch springs back to off, just like the real thing.
 
 | Switch | Drives | Keys | With the mouse |
@@ -38,7 +38,9 @@ Other keys: `J` changes how the running water from the wall outlets is drawn (bu
 
 The panel at the top left shows the thrusters, the depth, the heading and the **IMU**: how far the ROV is tilted (pitch: nose down is positive; roll: right side down is positive), what the **accelerometer** reads (x forward, y left, z up, in m/s², including gravity: about +9.81 up when it sits still), the same minus gravity, and the **gyro** (how fast it is turning). When the current is on it also shows how fast the water is moving at the ROV.
 
-Buttons: **Orbit** (drag to turn the view, scroll to zoom), **Deck** (you stand on the deck at the edge of the pool nearest the ROV, looking down at it and at what its nose is working on; the wheel zooms; a mission starts here), **Follow** (a chase camera), **Top**, **Current** (turns the water on and off), **Water FX**
+A **compass rose** on the deck beside the stairs wall shows what the **heading** numbers mean: 0° is toward the stairs wall, and the angle grows counter-clockwise seen from above (90° towards the shallow end).
+
+Buttons: **−** and **+** (zoom out and in, in whatever view you are in), **Orbit** (drag to turn the view; **hold Ctrl (or Shift) and drag, or drag with the right button, to move the view left, right, north and south**; scroll to zoom), **Deck** (you stand on the deck at the edge of the pool nearest the ROV, looking down at it and at what its nose is working on; the wheel zooms; **drag with the mouse to look around** a little, double-click to put it back; a mission starts here), **Follow** (a chase camera), **Top**, **Current** (turns the water on and off), **Water FX**
 (refraction and ripples), **Quality**, **Reset** (back to the start), **Config** (see below), **Help**. The little window is the ROV's own camera.
 
 **Config** opens a dialog. The first box changes the pool **right away**: the front **tool** (nose or claw), the **main pool size** (five sizes: 6 × 3 m, 12 × 3 m, 6 × 6 m, 12 × 6 m, 12 × 9 m; a wide pool has one lane line down the middle of each 3 m lane; the ROV, rings, fish, crabs and the wall outlets go back to the start in the new pool), whether the **water runs** out of the wall outlets and **how it is drawn**, and the red and green **thruster power**. The second box needs a **restart** (press *Restart with these*): the controls mode, the fish, rings, crabs and the camera. The link at the bottom makes the same setup for anyone you send it to, and the address is kept in step with the first box too, so a reload keeps it.
@@ -60,7 +62,7 @@ Buttons: **Orbit** (drag to turn the view, scroll to zoom), **Deck** (you stand 
 ## The 2026 SCOUT mission {#mission}
 
 Add **`?mission=scout2026`** to the address (or ask for a mission link) and the pool holds the props of the 2026 SCOUT competition instead of the rings. The pool is 6 × 6 m and 2 m deep (the SCOUT class is done in a 2 m pool), the ROV starts at the surface
-beside the stairs, and a **10 minute clock** starts with the ROV's first move. A **score board** on the right lists every task with its points and ticks them off (and takes the points back if something
+beside the stairs, and a **10 minute clock** starts with the ROV's first move. A **score board** on the right (below the camera window; the little arrow next to the score folds it away) lists every task with its points and ticks them off (and takes the points back if something
 is lost again). When the time is up the clock **does not stop**: it keeps counting, now in negative numbers (overtime), and everything still works. Only the physical tasks are in the simulator (125 points): the paper questions and the float are not.
 
 | Task | What to do | Points |
@@ -81,7 +83,7 @@ open it around the loop or pipe and close it.
 **`Tab`** opens the **inventory**: everything on the deck, including the things that start there (the two survey markers, the new sensor and the eDNA connector). Choose with the arrow keys and **Enter** (or the mouse) and
 the crew hangs it on the ROV's nose (or puts it in the open claw). Only at the stairs; **Esc** closes it.
 
-To make it a little easier to see and steer in a simulation, the props are about **1.5 times more forgiving** than the real ones (the catch zones, the targets and the waypoint are a bit bigger). Simplifications: the ROV passes through the frames and the platform (only the pot's handle can be pushed), the wires are drawn lines (the 2 m and 4 m wires are not enforced), and what has stuck (markers, connectors) stays stuck.
+To make it a little easier to see and steer in a simulation, the props are about **1.5 times more forgiving** than the real ones (the catch zones, the targets and the waypoint are a bit bigger). **`P`** (or the **Labels** button) puts a **plaque on the pool floor beside each prop** (two floor tiles each, fixed in place, readable from the deck looking out over the pool): the task number, what to do, and the real-world thing it stands for. They start off unless the address has **`labels=on`**. Simplifications: the ROV passes through the frames and the platform (only the pot's handle can be pushed), the wires are drawn lines (the 2 m and 4 m wires are not enforced), and what has stuck (markers, connectors) stays stuck.
 
 ## Micro:bit and Pico {#microcontrollers}
 
@@ -145,8 +147,20 @@ Values above 1 or below -1 are clamped. A thruster keeps its last value until yo
 
 ### A first program {#first-program}
 
-The micro:bit prints lines; the pool does the rest. Button A drives forward, button B reverses.
-(These examples are written to match the protocol but have **not been tried on real hardware yet**: tell us what you find.)
+The micro:bit writes lines; the pool does the rest. This **MakeCode** program (in the Python view, <https://makecode.microbit.org>) was tried on a real micro:bit:
+button A makes thruster 1 (the red one) run at full power.
+
+```python
+def on_button_pressed_a():
+    serial.write_line("p:t1,1")
+input.on_button_pressed(Button.A, on_button_pressed_a)
+```
+
+`serial.write_line("p:t1,1")` is the whole trick: one line per command. Add more buttons the same way (`p:t1,-1` is full reverse, `p:t1,0` stops).
+Close MakeCode's serial window before you connect the pool page, because only one program can have the USB port.
+
+The same idea in **MicroPython** (<https://python.microbit.org> or Mu), where `print()` is the line.
+(This one has **not been tried on real hardware yet**: tell us what you find.) Button A drives forward, button B reverses.
 
 ```python
 from microbit import button_a, button_b, sleep
@@ -213,6 +227,7 @@ for anyone you send it to. Every setting is also a plain option you can add to t
 | `rings=0` to `5` | how many pick-up rings (normally 3) |
 | `poollength=1` or `2` | the main pool is 6 m times this long (normally 1, so 6 m; 2 is 12 m) |
 | `mission=scout2026` | a **mission** instead of free driving: the 2026 SCOUT competition props are in the pool, with a score board and a 10 minute clock (browser version only; it also starts the pool at 6 × 6 m, 2 m deep, with no rings (the fish and the crab stay) unless the address says otherwise) |
+| `labels=on` or `off` | with a mission: put plaques on the pool floor beside each prop (normally off; **`P`** and the **Labels** button switch them while the page runs) |
 | `pooldepth=2`, `3`, `4` or `6` | how deep the main pool is, in metres (normally 2; the shallow end stays 1 m). Also in **Config** |
 | `poolwidth=1`, `2` or `3` | the main pool is 3 m times this wide (normally 1, so 3 m; 3 is 9 m) |
 | `speed=0.25` to `4` | the power of the red and green thrusters (normally 1). **1 is the normal speed, half of what these thrusters used to give**; 2 is the old strength. The up/down thrusters do not change |
@@ -233,7 +248,7 @@ Other options:
 | `tool=nose` or `tool=claw` | start with this tool (the web version starts with the nose) |
 | `buoyancy=positive`, `neutral` or `negative` | start floating, hovering, or sinking |
 | `quality=high`, `low`, `lowest` or `auto` | graphics level; **Auto** lowers it by itself if the page runs slowly, and `lowest` hides the ROV camera window |
-| `view=orbit`, `follow` or `top` | starting camera |
+| `view=orbit`, `deck`, `follow` or `top` | the camera view the page starts in (normally `orbit`; with a mission `deck`). The buttons change it while the page runs |
 | `mode=local` or `mode=server` | force the built-in simulation, or the Python server |
 | `selftest` | the page drives itself for a few seconds and writes PASS or FAIL in its title |
 

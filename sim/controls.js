@@ -38,6 +38,23 @@ export function switchTargets(n) {
   return n === 8 ? [["t1", "t3", "t5", "t7"], ["t2", "t4", "t6", "t8"], vertical] : [left, right, vertical];
 }
 
+/** Where the three on-screen switches stand, from the thruster commands the sim has (whoever sent them: the page's own keys and switches, ROS, a micro:bit over USB).
+ *  Each switch is -1 (reverse), 0 (stop) or +1 (forward): the average of its thrusters' commands (the corner thrusters of the 8 layout push the way their pattern says), snapped to
+ *  the nearest of the three positions: a real H-bridge switch has no in-between, and anything that is not (almost) zero shows the direction it is pushing. */
+export function switchPositions(cmd, n = 4, dead = 0.05) {
+  const targets = switchTargets(n), out = [];
+  targets.forEach((names, i) => {
+    let sum = 0, count = 0;
+    for (const t of names) {
+      const k = Number(t.slice(1)) - 1, sign = n === 8 ? (i === 2 ? CORNERS[k][2] : CORNERS[k][0]) : 1;     // (the 8 corner thrusters: red / green push ahead on the front ones and back on the rear, up / down is top up, bottom down)
+      sum += sign * (Number(cmd[t]) || 0); count++;
+    }
+    const v = count ? sum / count : 0;
+    out.push(v > dead ? 1 : v < -dead ? -1 : 0);
+  });
+  return out;
+}
+
 /** The command for the sim: {t1 ... t<n>, claw}. `hOnly`: ignore the extra keys, only the switches count. `thrusters` is the layout: 3, 4, 6 or 8.
  *  3 and 4: t1 / t2 are the left / right thrusters (the keys mix forward and turn), t3 (and t4) are the vertical ones (up, and nose trim with two).
  *  6 and 8: t1 front left, t2 front right, t3 rear left, t4 rear right (with 8: the top corners; t5-t8 the bottom ones), angled 45 degrees: forward is all of them, turning is the left side against the right,

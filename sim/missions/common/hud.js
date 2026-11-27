@@ -1,14 +1,17 @@
 // hud.js — the page's panels for a mission: the countdown clock, the score board, and the crew's inventory screen. Plain DOM (no three.js), made only when a mission is on.
 // setup({ backend, toast }) returns { update(state), get modal() }: the page calls update() with every state; while `modal` is true the page ignores the keyboard.
 const CSS = `
-#mission { position: fixed; right: 8px; top: 262px; width: 252px; z-index: 6; background: rgba(8,30,50,.82); color: #fff; border-radius: 10px; padding: 8px 10px;
-  font: 12px/1.35 -apple-system, system-ui, sans-serif; max-height: calc(100vh - 280px); overflow: auto; }
+/* the panel lives in the page's right-hand column (#rightcol), below the switch box and every camera window (order: 99 keeps it last, however many cameras are added); the column scrolls if all of it is too tall */
+#rightcol { max-height: calc(100vh - 66px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+#mission { order: 99; position: static; width: 252px; box-sizing: border-box; flex: none; z-index: 6; background: rgba(8,30,50,.82); color: #fff; border-radius: 10px; padding: 8px 10px;
+  font: 12px/1.3 -apple-system, system-ui, sans-serif; }
+#mission .fold { background: none; border: 0; color: #fff; opacity: .7; cursor: pointer; font-size: 12px; padding: 0 2px; margin-left: 6px; }
 #mission .top { display: flex; justify-content: space-between; align-items: baseline; }
 #mission .clock { font: 600 30px/1 ui-monospace, Menlo, monospace; letter-spacing: 1px; }
 #mission .clock.amber { color: #f2b705; } #mission .clock.red { color: #ff6b6b; } #mission .clock.over { color: #ff6b6b; }
 #mission .score { font: 600 14px ui-monospace, Menlo, monospace; }
 #mission .grp { margin: 6px 0 1px; font-weight: 600; opacity: .8; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-#mission .row { display: flex; gap: 6px; opacity: .55; } #mission .row.on { opacity: 1; color: #7be38f; }
+#mission .row { display: flex; gap: 6px; opacity: .55; font-size: 11.5px; } #mission .row.on { opacity: 1; color: #7be38f; }
 #mission .row .t { flex: 1; } #mission .row .p { font-family: ui-monospace, Menlo, monospace; }
 #mission .hint { margin-top: 6px; font-size: 11px; opacity: .7; }
 #mission .state { font-size: 11px; opacity: .8; margin-top: 2px; }
@@ -21,13 +24,18 @@ const CSS = `
 export function setupMissionHud({ backend, toast }) {
   const style = document.createElement("style"); style.textContent = CSS; document.head.appendChild(style);
   const panel = document.createElement("div"); panel.id = "mission"; panel.setAttribute("aria-label", "Mission score board and clock");
-  panel.innerHTML = `<div class="top"><span class="clock" id="mclock">10:00</span><span class="score" id="mscore">0 / 0</span></div><div class="state" id="mstate"></div><div id="mlist"></div>
+  panel.innerHTML = `<div class="top"><span class="clock" id="mclock">10:00</span><span class="score"><span id="mscore">0 / 0</span><button class="fold" id="mfold" title="Show or hide the list of tasks">\u25be</button></span></div><div class="state" id="mstate"></div><div id="mlist"></div>
     <div class="hint">G: at the stairs the crew takes what the ROV carries; anywhere else it lets go of it &nbsp; Tab: inventory</div>`;
-  document.body.appendChild(panel);
+  (document.getElementById("rightcol") || document.body).appendChild(panel);
   const inv = document.createElement("div"); inv.id = "minv";
   inv.innerHTML = `<div class="box" role="dialog" aria-label="Inventory"><h2>Inventory</h2><div class="sub" id="minvsub"></div><div id="minvlist"></div><div class="sub" style="margin-top:8px">&uarr; &darr; choose, Enter gives it to the ROV, Esc or Tab closes</div></div>`;
   document.body.appendChild(inv);
   const $ = (id) => document.getElementById(id);
+  let folded = false;
+  try { folded = localStorage.getItem("rovMissionFolded") === "1"; } catch (e) { /* no storage: start open */ }
+  const applyFold = () => { $("mlist").style.display = folded ? "none" : ""; panel.querySelector(".hint").style.display = folded ? "none" : ""; $("mfold").textContent = folded ? "\u25b8" : "\u25be"; };
+  $("mfold").addEventListener("click", () => { folded = !folded; try { localStorage.setItem("rovMissionFolded", folded ? "1" : "0"); } catch (e) { /* ignore */ } applyFold(); });
+  applyFold();
   let last = "", lastMsg = -1, items = [], sel = 0, open = false, cur = null;
 
   const render = (st) => {

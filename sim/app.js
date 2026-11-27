@@ -2,8 +2,8 @@
 // Coordinates: sim x = forward, y = left, depth = down  ->  three.js (x, -depth, -y).
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/OrbitControls.js";
-import { GAME_KEYS, SWITCHES, computeCommand, switchValues } from "./controls.js";
-import { MAX_RINGS, parseConfig, toQuery, poolSizeText } from "./config.js";
+import { GAME_KEYS, SWITCHES, computeCommand, switchPositions, switchValues } from "./controls.js";
+import { MAX_RINGS, parseConfig, toQuery, poolSizeText, startView } from "./config.js";
 import { layoutFor } from "./sim/physics.js";
 import { deckEye, nearestSide } from "./deckcam.js";                      // (the thruster layouts: the same table the server uses; the state carries its own)
 
@@ -42,6 +42,8 @@ controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.98;
 controls.minDistance = 0.8;
 controls.maxDistance = 16;
+controls.screenSpacePanning = false;           // Ctrl (or Shift, or the right button) + drag moves the view along the water: left / right / north / south, not up and down
+controls.panSpeed = 1.3;
 controls.zoomToCursor = true;                  // the wheel zooms towards the mouse pointer: easy to dive into a detail and to back out again
 controls.zoomSpeed = 1.6;
 controls.screenSpacePanning = true;
@@ -270,6 +272,33 @@ function buildPool() {
     deck.position.y = 0.01;
     pool.add(deck);
     solid(deck, (c) => c.y < 0.01);
+  }
+
+  // a compass rose on the deck, beside the stairs wall: the headings on the screen (0 to 360 degrees) are measured from the +x direction, counter-clockwise seen from above
+  {
+    const cv = document.createElement("canvas"); cv.width = cv.height = 512;
+    const g = cv.getContext("2d"), c0 = 256;
+    g.clearRect(0, 0, 512, 512);
+    g.fillStyle = "rgba(250, 247, 238, 0.92)"; g.beginPath(); g.arc(c0, c0, 244, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "#0d3b4f"; g.lineWidth = 6; g.beginPath(); g.arc(c0, c0, 236, 0, Math.PI * 2); g.stroke(); g.lineWidth = 2; g.beginPath(); g.arc(c0, c0, 150, 0, Math.PI * 2); g.stroke();
+    for (let a = 0; a < 360; a += 15) {                                                  // ticks every 15 degrees
+      const r1 = a % 45 === 0 ? 150 : 205, r2 = 236, rad = a * Math.PI / 180;
+      g.lineWidth = a % 45 === 0 ? 4 : 2; g.beginPath(); g.moveTo(c0 + r1 * Math.cos(rad), c0 - r1 * Math.sin(rad)); g.lineTo(c0 + r2 * Math.cos(rad), c0 - r2 * Math.sin(rad)); g.stroke();
+    }
+    for (const [a, big] of [[0, 1], [45, 0], [90, 1], [135, 0], [180, 1], [225, 0], [270, 1], [315, 0]]) {            // the points of the rose
+      const rad = a * Math.PI / 180, w = big ? 26 : 14, len = big ? 140 : 100;
+      g.fillStyle = big ? (a === 0 ? "#d62d2d" : "#0d3b4f") : "#5f8fa3";
+      g.beginPath(); g.moveTo(c0 + len * Math.cos(rad), c0 - len * Math.sin(rad));
+      g.lineTo(c0 + w * Math.cos(rad + Math.PI / 2), c0 - w * Math.sin(rad + Math.PI / 2)); g.lineTo(c0 + w * Math.cos(rad - Math.PI / 2), c0 - w * Math.sin(rad - Math.PI / 2)); g.closePath(); g.fill();
+    }
+    g.fillStyle = "#0d3b4f"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "bold 40px system-ui, sans-serif";
+    for (const a of [0, 90, 180, 270]) { const rad = a * Math.PI / 180; g.fillText(a + "\u00b0", c0 + 188 * Math.cos(rad) * 0.9 + (a === 0 ? -6 : a === 180 ? 6 : 0), c0 - 188 * Math.sin(rad) * 0.9); }
+    g.font = "bold 26px system-ui, sans-serif"; g.fillText("HEADING", c0, c0 + 4); g.font = "20px system-ui, sans-serif"; g.fillText("0\u00b0 = toward the stairs wall", c0, c0 + 32);
+    const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+    const main = regions.reduce((a, b) => (b.d > a.d ? b : a));
+    const rose = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.0).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    rose.position.set(main.x1 + 1.5, 0.02, (main.z0 + main.z1) / 2 + 1.5);                // on the deck beside the main pool's stairs wall (the canvas's right = +x = 0 degrees, its top = +y = 90 degrees)
+    pool.add(rose);
   }
 
   // one lane line down the middle of each 3 m lane on the deep floor (a wide pool has several), with a "T" at each end like a real pool, and short 1 m ruler ticks
@@ -698,7 +727,9 @@ import("./fish.js").then((m) => { fish = new m.Fish(scene, THREE); }).catch(() =
 let missionHud = null;                // a mission (?mission=): the score board, the clock and the crew's inventory (missions/common/hud.js); nothing is loaded without one
 if (backend.features.mission) import("./missions/common/hud.js").then((m) => { missionHud = m.setupMissionHud({ backend, toast }); }).catch((e) => console.warn("mission panel failed:", e));
 let missionView = null;               // the mission's props, drawn (missions/<name>/props3d.js)
-if (backend.features.mission) import(`./missions/${cfg.mission}/props3d.js`).then((m) => { missionView = new m.MissionView(scene, THREE); }).catch((e) => console.warn("mission props failed:", e));
+if (backend.features.mission) import(`./missions/${cfg.mission}/props3d.js`).then((m) => { missionView = new m.MissionView(scene, THREE); if (cfg.labels) toggleLabels(); }).catch((e) => console.warn("mission props failed:", e));
+function toggleLabels() { if (!missionView) return; missionView.setLabels(!missionView.labelsOn, floorAt); $("labels").classList.toggle("on", missionView.labelsOn); liveCfg.labels = missionView.labelsOn; syncAddress(); toast(missionView.labelsOn ? "Labels on (P turns them off)" : "Labels off"); }
+if (backend.features.mission) { $("labels").style.display = ""; $("labels").addEventListener("click", toggleLabels); }
 let eels = null;                      // optional joke add-on: eel.js draws the electric eel, the sparks and the smoke (delete that file to remove them)
 import("./eel.js").then((m) => { eels = new m.Eels(scene, THREE); }).catch(() => { /* no eel */ });
 let crabs = null;                     // optional add-on: crab.js draws the green crabs (delete that file to remove them)
@@ -860,6 +891,7 @@ window.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "KeyV" && !e.repeat) { resetView(); return; }
   if (eelDead()) { e.preventDefault(); return; }
+  if (e.code === "KeyP" && !e.repeat && missionView) { toggleLabels(); return; }                      // plaques on the floor beside each prop
   if (backend.features.mission && !e.repeat) {                                // the mission's crew keys
     if (e.code === "KeyG") { backend.missionDeliver(); return; }
     if (e.code === "Tab" && missionHud) { e.preventDefault(); missionHud.toggleInventory(); return; }
@@ -938,8 +970,9 @@ swEls.forEach((el, i) => {
 $("hmode").addEventListener("click", () => { if (!hLocked) setHOnly(!hOnly); });
 if (hLocked) $("hmode").style.cursor = "default";                   // (set by the page address; no tooltip, it would cover the pool)
 setHOnly(hOnly, false);
-function drawSwitches() {
-  switchValues(held, pointerSw).forEach((v, i) => {
+function drawSwitches() {                                       // the levers show the commands the sim really has (from the page, ROS or a micro:bit): forward, stop or reverse, never half way
+  const real = switchPositions(state, state.thrusters || 4);
+  real.map((v, i) => pointerSw[i] || v).forEach((v, i) => {
     const lever = swEls[i].querySelector(".swlever");
     lever.style.transform = SWITCHES[i].orient === "h" ? `translateX(${v * 26}px)` : `translateY(${-v * 22}px)`;
     lever.classList.toggle("on", v !== 0);
@@ -1021,7 +1054,7 @@ function resetView() {
   userMoved = false;
   overviewCamera();
 }
-renderer.domElement.addEventListener("dblclick", resetView);
+renderer.domElement.addEventListener("dblclick", () => { if (view === "deck") { deck.pan.set(0, 0, 0); deck.zoom = 1.0; } else resetView(); });
 let view = "orbit";
 /** The rectangle of the pool region the ROV is over (or the nearest one): the edges the Deck view's person stands at. */
 function deckRegion(x, z) {
@@ -1030,8 +1063,56 @@ function deckRegion(x, z) {
   const dist = (r) => Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
   return regions.reduce((a, b) => (dist(b) < dist(a) ? b : a));
 }
-const deck = { side: null, eye: new THREE.Vector3(), focus: new THREE.Vector3(), zoom: 1.0 };       // the Deck view: where the person stands and what they look at
-renderer.domElement.addEventListener("wheel", (e) => { if (view !== "deck") return; e.preventDefault(); deck.zoom = Math.max(0.35, Math.min(2.5, deck.zoom * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); }, { passive: false });
+const deck = { side: null, eye: new THREE.Vector3(), focus: new THREE.Vector3(), zoom: 1.0, pan: new THREE.Vector3() };       // the Deck view: where the person stands and what they look at
+renderer.domElement.addEventListener("wheel", (e) => { if (view !== "deck") return; e.preventDefault(); zoomBy(e.deltaY > 0 ? 1 / 1.12 : 1.12); }, { passive: false });
+// Orbit view: Ctrl (or Shift, or the right button) + drag slides the whole view along the water (left / right / north / south) instead of tilting it; the height never changes.
+{
+  let pan = null;
+  window.addEventListener("pointerdown", (e) => {
+    if (view !== "orbit" || e.target !== renderer.domElement || !(e.ctrlKey || e.shiftKey || e.button === 2) || document.getElementById("configui")) return;
+    e.stopImmediatePropagation(); e.preventDefault();                                        // (OrbitControls does not get this drag)
+    pan = { x: e.clientX, y: e.clientY }; userMoved = true;
+    try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+  }, true);
+  window.addEventListener("pointermove", (e) => {
+    if (!pan || view !== "orbit") return;
+    const dx = e.clientX - pan.x, dy = e.clientY - pan.y; pan.x = e.clientX; pan.y = e.clientY;
+    const f = controls.target.clone().sub(camera.position); f.y = 0; if (f.lengthSq() < 1e-8) return; f.normalize();
+    const right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)), k = 0.0022 * camera.position.distanceTo(controls.target);
+    const d = right.multiplyScalar(-dx * k).addScaledVector(f, dy * k);                      // grab the water and move it with the mouse
+    controls.target.add(d); camera.position.add(d); controls.update();
+  }, true);
+  const stop = (e) => { if (!pan) return; pan = null; try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
+  window.addEventListener("pointerup", stop, true); window.addEventListener("pointercancel", stop, true);
+  renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+/** The toolbar's + and - (also used by the wheel in the Deck view): zoom whatever the current view is. f > 1 zooms in. */
+function zoomBy(f) {
+  if (view === "deck") deck.zoom = Math.max(0.35, Math.min(2.5, deck.zoom / f));
+  else if (view === "orbit") {
+    const v = camera.position.clone().sub(controls.target), len = Math.max(controls.minDistance, Math.min(controls.maxDistance, v.length() / f));
+    camera.position.copy(controls.target).add(v.setLength(len)); userMoved = true; controls.update();
+  } else if (view === "follow") followK = Math.max(0.4, Math.min(3, followK / f));
+  else if (view === "top") topK = Math.max(0.3, Math.min(2.5, topK / f));
+}
+let followK = 1.0, topK = 1.0;                 // how far the Follow and Top cameras stand back (the + and - buttons)
+$("zoomin").addEventListener("click", () => zoomBy(1.25));
+$("zoomout").addEventListener("click", () => zoomBy(1 / 1.25));
+// the Deck view: drag with the mouse to look around a little (the view still follows the ROV); double-click puts it back
+{
+  let drag = null;
+  renderer.domElement.addEventListener("pointerdown", (e) => { if (view === "deck" && e.button === 0) { drag = { x: e.clientX, y: e.clientY }; renderer.domElement.setPointerCapture(e.pointerId); } });
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (!drag || view !== "deck") return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    const f = deck.focus.clone().sub(deck.eye); f.y = 0; if (f.lengthSq() < 1e-6) return; f.normalize();
+    const right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)), k = 0.0035 * camera.position.distanceTo(deck.focus);
+    deck.pan.addScaledVector(right, -dx * k).addScaledVector(f, dy * k);                       // grab the water and move it
+    if (deck.pan.length() > 2.5) deck.pan.setLength(2.5);
+  });
+  const end = (e) => { drag = null; try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (err) { /* not captured */ } };
+  renderer.domElement.addEventListener("pointerup", end); renderer.domElement.addEventListener("pointercancel", end);
+}
 function setView(v) {
   const was = view;
   view = v;
@@ -1039,8 +1120,8 @@ function setView(v) {
   if (v !== "deck" && camera.fov !== FOV0) { camera.fov = FOV0; camera.updateProjectionMatrix(); }
   document.querySelectorAll("[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
   const pc = poolCenter();
-  if (v === "deck") { deck.side = null; deck.eye.set(rov.position.x, 1.8, rov.position.z + 4); deck.focus.copy(rov.position); }        // (start where the ROV is: it then slides to the edge)
-  if (v === "top") { camera.position.set(pc.x, 7.5 * fitFactor() * poolScale(), pc.z + 0.01); camera.lookAt(pc.x, 0, pc.z); }
+  if (v === "deck") { deck.pan.set(0, 0, 0); deck.side = null; deck.eye.set(rov.position.x, 1.8, rov.position.z + 4); deck.focus.copy(rov.position); }        // (start where the ROV is: it then slides to the edge)
+  if (v === "top") { camera.position.set(pc.x, 7.5 * topK * fitFactor() * poolScale(), pc.z + 0.01); camera.lookAt(pc.x, 0, pc.z); }
   if (v === "orbit") { controls.target.copy(pc); if (was !== "orbit" && typeof overviewCamera === "function") { overviewCamera(); userMoved = false; } }       // coming back from Follow or Top: the whole pool again, not wherever the chase camera was
 }
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
@@ -1057,7 +1138,7 @@ $("reset").addEventListener("click", () => {
   backend.reset();
   held.clear(); clawCmd = 0; sendCommand();
 });
-setView(new URLSearchParams(location.search).get("view") || (cfg.mission !== "none" ? "deck" : "orbit"));   // e.g. /?view=follow (a mission starts on the deck)
+setView(startView(location.search, cfg.mission));                 // /?view=orbit|deck|follow|top (a mission starts on the deck)
 { const c = new URLSearchParams(location.search).get("cam");               // e.g. /?cam=6,-1,0
   const tg = new URLSearchParams(location.search).get("target");            // e.g. /?cam=..&target=-1,-1,0
   if (tg) controls.target.set(...tg.split(",").map(Number));
@@ -1087,6 +1168,11 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 controls.addEventListener("start", () => { userMoved = true; });
+controls.addEventListener("change", () => {                  // do not let the view be panned away from the pool altogether
+  const lo = new THREE.Vector3(bbox.x0 - 3, -maxDepth, bbox.z0 - 3), hi = new THREE.Vector3(bbox.x1 + 3, 1.5, bbox.z1 + 3);
+  const t = controls.target, c = t.clone().clamp(lo, hi);
+  if (!c.equals(t)) { const d = c.sub(t); controls.target.add(d); camera.position.add(d); }
+});
 let refit = 0;
 function onResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPR));   // zoom changes devicePixelRatio
@@ -1155,7 +1241,7 @@ function frame(now) {
   if (crabs) crabs.update(state.props, dt, t);
   if (eels) eels.update(state.props, dt, t, rov);
   if (missionHud) missionHud.update(state);
-  if (missionView) missionView.update(state.props, dt, t, floorAt);
+  if (missionView) { missionView.update(state.props, dt, t, floorAt); }
   { const eel = eelProp(); if (eel && eel.zap) wobble = Math.max(wobble, 0.9); }        
   if (jets) jets.update(state.props, dt);
   for (const m of solids) {                          // x-ray: fade what is between us and the pool
@@ -1166,9 +1252,9 @@ function frame(now) {
 
   if (view === "deck") {                                  // a person on the deck at the pool's edge, looking down at the ROV and at what its nose is working on
     const rect = deckRegion(rov.position.x, rov.position.z);                                                       // the water's edges where the ROV is (not the stairs sticking out of the wall)
-    deck.side = nearestSide(rect, { x: rov.position.x, z: rov.position.z }, deck.side);
+    deck.side = nearestSide(rect, { x: rov.position.x, z: rov.position.z }, deck.side, 1.0, cfg.mission !== "none" ? 1 : null);       // (a mission: the east wall, with the stairs, is where the crew stands)
     const eye = deckEye(rect, deck.side, rov.position).eye;                                                       // standing outside the wall, leaning out over the water as far as it takes to see the ROV
-    const ahead = new THREE.Vector3(0.35, -0.12, 0).applyAxisAngle(ey, shown.yaw);                                 // look a little ahead of the ROV: that is where the nose works
+    const ahead = new THREE.Vector3(0.35, -0.12, 0).applyAxisAngle(ey, shown.yaw).add(deck.pan);                                 // look a little ahead of the ROV: that is where the nose works
     deck.focus.lerp(want.copy(rov.position).add(ahead), 1 - Math.exp(-dt * 4));
     deck.eye.lerp(want.set(...eye), 1 - Math.exp(-dt * 2.5));
     camera.position.copy(deck.eye);
@@ -1176,7 +1262,7 @@ function frame(now) {
     const d = camera.position.distanceTo(deck.focus), fov = Math.max(14, Math.min(50, 2 * Math.atan(1.3 * deck.zoom / d) * 180 / Math.PI));   // about 2.6 m across at the ROV, whatever the distance
     if (Math.abs(fov - camera.fov) > 0.1) { camera.fov = fov; camera.updateProjectionMatrix(); }
   } else if (view === "follow") {
-    off.set(-1.25, 0.55, 0).applyAxisAngle(ey, shown.yaw);
+    off.set(-1.25 * followK, 0.55 * (0.6 + 0.4 * followK), 0).applyAxisAngle(ey, shown.yaw);
     want.copy(rov.position).add(off);
     camera.position.lerp(want, 1 - Math.exp(-dt * 4));
     camera.lookAt(rov.position);
