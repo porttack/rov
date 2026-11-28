@@ -215,6 +215,8 @@ function wallSegments() {
   return segs;
 }
 
+let sceneryMod = null, scenery = null, deckBox = null;      // quiet scenery far away (scenery.js, optional); the pool is built again once it has loaded
+if (cfg.scenery) import("./scenery.js").then((m) => { sceneryMod = m; buildPool(); }).catch(() => { /* no scenery */ });
 function buildPool() {
   pool.clear();
   solids.length = 0;
@@ -258,6 +260,7 @@ function buildPool() {
     const xs = new Set([bbox.x0 - 7 * grow, bbox.x1 + 7 * grow]), zs = new Set([bbox.z0 - 6 * grow, bbox.z1 + 6 * grow]);
     for (const r of regions) { xs.add(r.x0); xs.add(r.x1); zs.add(r.z0); zs.add(r.z1); }
     const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b), pos = [], idx = [];
+    deckBox = { x0: X[0], x1: X[X.length - 1], z0: Z[0], z1: Z[Z.length - 1] };
     for (let i = 0; i < X.length - 1; i++) for (let j = 0; j < Z.length - 1; j++) {
       if (insidePool((X[i] + X[i + 1]) / 2, (Z[j] + Z[j + 1]) / 2, -EPS)) continue;      // that cell is water
       const k = pos.length / 3;
@@ -273,6 +276,9 @@ function buildPool() {
     pool.add(deck);
     solid(deck, (c) => c.y < 0.01);
   }
+
+  scenery = null;
+  if (cfg.scenery && sceneryMod && deckBox) { scenery = sceneryMod.buildScenery(THREE, deckBox, cx); pool.add(scenery.group); }       // grass beyond the deck, and the koi pond
 
   // a compass rose on the deck, beside the stairs wall: the headings on the screen (0 to 360 degrees) are measured from the +x direction, counter-clockwise seen from above
   {
@@ -721,14 +727,15 @@ rov.rotation.order = "YXZ";           // yaw first, then roll about the ROV's ow
 
 // ---------- optional add-on: props.js draws the pick-up ring (delete that file to remove it) ----------
 let props = null;
+import("./music.js").then((m) => m.initMusic()).catch(() => { /* no music */ });
 import("./props.js").then((m) => { props = new m.Props(scene, THREE); }).catch(() => { /* no props */ });
 let fish = null;                      // optional add-on: fish.js draws the coy fish (delete that file to remove it)
 import("./fish.js").then((m) => { fish = new m.Fish(scene, THREE); }).catch(() => { /* no fish */ });
 let missionHud = null;                // a mission (?mission=): the score board, the clock and the crew's inventory (missions/common/hud.js); nothing is loaded without one
 if (backend.features.mission) import("./missions/common/hud.js").then((m) => { missionHud = m.setupMissionHud({ backend, toast }); }).catch((e) => console.warn("mission panel failed:", e));
 let missionView = null;               // the mission's props, drawn (missions/<name>/props3d.js)
-if (backend.features.mission) import(`./missions/${cfg.mission}/props3d.js`).then((m) => { missionView = new m.MissionView(scene, THREE); if (cfg.labels) toggleLabels(); }).catch((e) => console.warn("mission props failed:", e));
-function toggleLabels() { if (!missionView) return; missionView.setLabels(!missionView.labelsOn, floorAt); $("labels").classList.toggle("on", missionView.labelsOn); liveCfg.labels = missionView.labelsOn; syncAddress(); toast(missionView.labelsOn ? "Labels on (P turns them off)" : "Labels off"); }
+if (backend.features.mission) import(`./missions/${cfg.mission}/props3d.js`).then((m) => { missionView = new m.MissionView(scene, THREE); if (missionView.hasLabels === false) $("labels").style.display = "none"; else if (cfg.labels) toggleLabels(); }).catch((e) => console.warn("mission props failed:", e));
+function toggleLabels() { if (!missionView || missionView.hasLabels === false) return; missionView.setLabels(!missionView.labelsOn, floorAt); $("labels").classList.toggle("on", missionView.labelsOn); liveCfg.labels = missionView.labelsOn; syncAddress(); toast(missionView.labelsOn ? "Labels on (P turns them off)" : "Labels off"); }
 if (backend.features.mission) { $("labels").style.display = ""; $("labels").addEventListener("click", toggleLabels); }
 let eels = null;                      // optional joke add-on: eel.js draws the electric eel, the sparks and the smoke (delete that file to remove them)
 import("./eel.js").then((m) => { eels = new m.Eels(scene, THREE); }).catch(() => { /* no eel */ });
@@ -891,7 +898,7 @@ window.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "KeyV" && !e.repeat) { resetView(); return; }
   if (eelDead()) { e.preventDefault(); return; }
-  if (e.code === "KeyP" && !e.repeat && missionView) { toggleLabels(); return; }                      // plaques on the floor beside each prop
+  if (e.code === "KeyP" && !e.repeat && missionView && missionView.hasLabels !== false) { toggleLabels(); return; }                      // plaques on the floor beside each prop
   if (backend.features.mission && !e.repeat) {                                // the mission's crew keys
     if (e.code === "KeyG") { backend.missionDeliver(); return; }
     if (e.code === "Tab" && missionHud) { e.preventDefault(); missionHud.toggleInventory(); return; }
@@ -1242,6 +1249,7 @@ function frame(now) {
   if (eels) eels.update(state.props, dt, t, rov);
   if (missionHud) missionHud.update(state);
   if (missionView) { missionView.update(state.props, dt, t, floorAt); }
+  if (scenery) scenery.update(t);
   { const eel = eelProp(); if (eel && eel.zap) wobble = Math.max(wobble, 0.9); }        
   if (jets) jets.update(state.props, dt);
   for (const m of solids) {                          // x-ray: fade what is between us and the pool
@@ -1475,7 +1483,7 @@ if (new URLSearchParams(location.search).has("selftest")) {
       for (let k = 0; k < 200 && eelDead(); k++) await wait(100);
       if (eelDead()) return fail("the ROV never woke up again");
     }
-    if (backend.features.mission) {                                    // a mission: its panel, the props drawn, the board
+    if (backend.features.mission && cfg.mission === "scout2026") {      // the Scout mission: its panel, the props drawn, the board
       for (let k = 0; k < 60 && !(missionView && missionHud && missionView.items.size >= 8); k++) await wait(100);
       const mp = (state.props || []).find((p) => p.type === "mission");
       if (!document.getElementById("mission") || !mp || mp.board.items.length < 10) return fail("the mission panel or its state is missing");

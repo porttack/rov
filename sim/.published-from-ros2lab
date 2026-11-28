@@ -1,2 +1,2 @@
-copied from nodes/rov_sim/web of the ros2lab repo at commit 3bc6c47 on 2026-11-27T21:13Z
+copied from nodes/rov_sim/web of the ros2lab repo at commit 134864d on 2026-11-28T04:11Z
 edit it there, then run tools/publish_web.sh again: changes made here are overwritten

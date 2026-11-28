@@ -1,6 +1,7 @@
 // layout.js — where things are in the 2026 SCOUT mission. Positions are WALL-RELATIVE: `u` metres out from the pool wall at the shallow end's side (the wall the stairs are in),
 // `v` metres to the left of the pool's middle line when looking out from the wall (sim y = middle + v). The manual only shows "a possible layout": change the numbers here.
-import { POOL_REGIONS, POOL_WATER } from "../../sim/physics.js";
+import { POOL_WATER } from "../../sim/physics.js";
+import { stairsRect } from "../common/stairs.js";
 
 export const ASSIST = 1.5;                                   // props are a little bigger and the targets a little more forgiving than in real life: it is harder to see and steer in a simulation
 export const RUN_SECONDS = 600;                              // the manual: a 10 minute performance
@@ -14,12 +15,7 @@ export function frame() {
 /** World [x, y] of a wall-relative spot. */
 export function at(u, v) { const f = frame(); return [f.wallX - u, f.midY + v]; }
 
-/** The stairs as one rectangle [x0, x1, y0, y1], or null. */
-export function stairsRect() {
-  const st = POOL_REGIONS.slice(POOL_WATER.length);
-  if (!st.length) return null;
-  return [Math.min(...st.map((r) => r[0])), Math.max(...st.map((r) => r[1])), Math.min(...st.map((r) => r[2])), Math.max(...st.map((r) => r[3]))];
-}
+export { stairsRect };
 /** Is the ROV at the stairs (over a step, or just in front of them), near the surface, where the crew can reach it? */
 export function atStairs(rov) {
   const r = stairsRect();

@@ -226,7 +226,10 @@ for anyone you send it to. Every setting is also a plain option you can add to t
 | `fish=on` or `off` | the fish (normally off) |
 | `rings=0` to `5` | how many pick-up rings (normally 3) |
 | `poollength=1` or `2` | the main pool is 6 m times this long (normally 1, so 6 m; 2 is 12 m) |
+| `mission=rings2026` | **the default**: the little **Pool Rings 2026** game: pick up pool rings and take them to the stairs; **G** lets go of a ring there for 5 points and a new ring drops somewhere in the pool. A 5 minute clock starts at your first move (browser version only) |
+| `mission=none` | no mission at all: free driving (the pool, the rings, the keys), with no score board or clock |
 | `mission=scout2026` | a **mission** instead of free driving: the 2026 SCOUT competition props are in the pool, with a score board and a 10 minute clock (browser version only; it also starts the pool at 6 × 6 m, 2 m deep, with no rings (the fish and the crab stay) unless the address says otherwise) |
+| `scenery=on` or `off` | quiet scenery far from the pool: grass beyond the deck and a small koi pond (normally on; also a tick box in **Config**) |
 | `labels=on` or `off` | with a mission: put plaques on the pool floor beside each prop (normally off; **`P`** and the **Labels** button switch them while the page runs) |
 | `pooldepth=2`, `3`, `4` or `6` | how deep the main pool is, in metres (normally 2; the shallow end stays 1 m). Also in **Config** |
 | `poolwidth=1`, `2` or `3` | the main pool is 3 m times this wide (normally 1, so 3 m; 3 is 9 m) |
@@ -262,5 +265,9 @@ The **Quality** choice and (when no `controls` option is given) the **H-bridge o
 - The full protocol is on this page; the project's `docs/PROTOCOL.md` describes the same lines for the ROS bridge.
 - To give students a fixed setup (for example H-circuit only, 2 rings, no fish), open **Set up the pool**, choose, and send them the link it makes.
 - The page uses no outside web sites (everything is bundled), so a school web filter does not break it.
+
+## Music
+
+The note (&#9835;) in the title bar turns all the sound on and off (the music, and the eel's zap and bang); Config sets the volume (half by default) or plays a file of your own. The track is "WHEN THE SKY TURNS BLUE" by BOCrew, from [ccMixter](https://ccmixter.org/files/BOCrew/31685), licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 
 [Back to the pool](index.html)

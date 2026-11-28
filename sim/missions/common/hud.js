@@ -9,6 +9,7 @@ const CSS = `
 #mission .top { display: flex; justify-content: space-between; align-items: baseline; }
 #mission .clock { font: 600 30px/1 ui-monospace, Menlo, monospace; letter-spacing: 1px; }
 #mission .clock.amber { color: #f2b705; } #mission .clock.red { color: #ff6b6b; } #mission .clock.over { color: #ff6b6b; }
+#mission .mtitle { font: 600 12px -apple-system, system-ui, sans-serif; opacity: .85; margin: 1px 0 2px; letter-spacing: .03em; }
 #mission .score { font: 600 14px ui-monospace, Menlo, monospace; }
 #mission .grp { margin: 6px 0 1px; font-weight: 600; opacity: .8; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 #mission .row { display: flex; gap: 6px; opacity: .55; font-size: 11.5px; } #mission .row.on { opacity: 1; color: #7be38f; }
@@ -24,7 +25,7 @@ const CSS = `
 export function setupMissionHud({ backend, toast }) {
   const style = document.createElement("style"); style.textContent = CSS; document.head.appendChild(style);
   const panel = document.createElement("div"); panel.id = "mission"; panel.setAttribute("aria-label", "Mission score board and clock");
-  panel.innerHTML = `<div class="top"><span class="clock" id="mclock">10:00</span><span class="score"><span id="mscore">0 / 0</span><button class="fold" id="mfold" title="Show or hide the list of tasks">\u25be</button></span></div><div class="state" id="mstate"></div><div id="mlist"></div>
+  panel.innerHTML = `<div class="top"><span class="clock" id="mclock">10:00</span><span class="score"><span id="mscore">0 / 0</span><button class="fold" id="mfold" title="Show or hide the list of tasks">\u25be</button></span></div><div class="mtitle" id="mtitle"></div><div class="state" id="mstate"></div><div id="mlist"></div>
     <div class="hint">G: at the stairs the crew takes what the ROV carries; anywhere else it lets go of it &nbsp; Tab: inventory</div>`;
   (document.getElementById("rightcol") || document.body).appendChild(panel);
   const inv = document.createElement("div"); inv.id = "minv";
@@ -40,7 +41,9 @@ export function setupMissionHud({ backend, toast }) {
 
   const render = (st) => {
     const b = st.board, sig = JSON.stringify(b.items.map((i) => i.earned));
-    $("mscore").textContent = `${b.total} / ${b.max}`;
+    $("mscore").textContent = b.max ? `${b.total} / ${b.max}` : `${b.total}`;          // (a game with no top score shows just the points)
+    $("mtitle").textContent = st.title || "";
+    if (st.hint !== undefined && panel.querySelector(".hint").textContent !== st.hint) panel.querySelector(".hint").textContent = st.hint;
     if (sig !== last) {
       last = sig;
       let html = "", g = "";

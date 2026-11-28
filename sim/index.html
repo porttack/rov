@@ -12,6 +12,8 @@
            padding: 8px 10px; backdrop-filter: blur(4px); }
   #hud { top: 8px; left: 8px; min-width: 215px; }
   #hud h1 { margin: 0 0 6px; font-size: 13px; letter-spacing: .04em; }
+  #music { background: none; border: 0; color: inherit; font-size: 15px; line-height: 1; padding: 0 3px; cursor: pointer; opacity: .45; vertical-align: -1px; }
+  #music.on { opacity: 1; color: #f2b705; }
   #dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
          background: #e55; margin-right: 6px; }
   #dot.ok { background: #4d8; }
@@ -98,7 +100,7 @@
 </head>
 <body>
 <div id="hud" class="panel">
-  <h1><span id="dot"></span><span id="status">waiting for sim...</span></h1>
+  <h1><span id="dot"></span><span id="status">waiting for sim...</span> <button id="music" title="Sound on / off: the music and the eel effects (volume and your own file: Config)" aria-pressed="false">&#9835;</button></h1>
   <div id="thrusters"></div>                       <!-- one bar per thruster, built by app.js from the layout (3, 4, 6 or 8) -->
   <div class="row"><span class="lbl">tool</span><span id="claw">closed</span></div>
   <div class="row"><span class="lbl">depth</span><span id="depth">0.00 m</span></div>

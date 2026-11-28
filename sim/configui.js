@@ -4,7 +4,7 @@
 //               (app.js gives this file a `live` object that does the work).
 //   RESTART     the controls mode, the fish, rings, crabs and the camera are built when the page starts: they apply when you press Restart,
 //               which reloads the page with the new address.
-import { DEFAULTS, LIMITS, CONFIG_KEYS, FLOW_LOOKS, THRUSTER_MODES, POOL_DEPTHS, POOL_PRESETS, toQuery, poolSizeText } from "./config.js";
+import { DEFAULTS, LIMITS, CONFIG_KEYS, FLOW_LOOKS, THRUSTER_MODES, POOL_DEPTHS, POOL_PRESETS, MISSIONS, MISSION_NAMES, toQuery, poolSizeText } from "./config.js";
 
 const CSS = `
 #configui { position: fixed; inset: 0; z-index: 50; background: rgba(4, 16, 26, .3); display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
@@ -74,16 +74,20 @@ export function showConfig({ cfg, configurable = {}, live = {} }) {
       <div class="row ${off(live.speed)}"><label for="cfg-speed">Red and green thruster power <small>(1&times; = normal)</small></label>
         <span class="speed"><input type="range" id="cfg-speed" min="${LIMITS.speed[0]}" max="${LIMITS.speed[1]}" step="0.25" value="${cur.speed}"${dis(live.speed)}> <b id="cfg-speedv"></b></span></div>
       <div class="row ${off(live.thrusters)}"><label for="cfg-thrusters">Thrusters <small>(the ROV starts over)</small></label><select id="cfg-thrusters"${dis(live.thrusters)}>${THRUSTER_MODES.map((n) => `<option value="${n}"${cur.thrusters === n ? " selected" : ""}>${{ 3: "3: red, green, one up/down", 4: "4: red, green, front and rear up/down", 6: "6: four on the posts, two up/down", 8: "8: one at each of the 8 corners" }[n]}</option>`).join("")}</select></div>
+      <div class="row inline"><label><input type="checkbox" id="cfg-music"> <span>Music <small id="cfg-musicnote"></small></span></label>
+        <span class="speed"><input type="range" id="cfg-musicvol" min="0" max="1" step="0.05" aria-label="Music volume"> <input type="file" id="cfg-musicfile" accept="audio/*" hidden><button class="quiet" id="cfg-musicpick" title="Play an audio file from this computer">Choose&hellip;</button></span></div>
       <div class="note" id="cfg-size"></div>
       ${live.pool && live.current ? "" : '<div class="note">With the Python server the pool size, the water and the thruster power are set when it starts (--current, --speed, its pool).</div>'}
     </fieldset>
     <fieldset><legend>Needs a restart</legend>
+      <div class="row ${off(can("mission"))}"><label for="cfg-mission">Mission</label><select id="cfg-mission"${dis(can("mission"))}>${MISSIONS.map((v) => opt(v, MISSION_NAMES[v], cur.mission === v)).join("")}</select></div>
       ${radio("all", "All keys", "the three switches and the extra keys. H switches modes.")}
       ${radio("h", "H-circuit only", "just the three switches, like the real controller. Locked: H does nothing.")}
       ${radio("h-hidden", "H-circuit only, everything else hidden", "only the switch box (and the camera view) on the page.")}
       <div class="row ${off(can("fish"))}"><label><input type="checkbox" id="cfg-fish"${cur.fish ? " checked" : ""}${dis(can("fish"))}> Fish</label></div>
       <div class="row ${off(can("rings"))}"><label for="cfg-rings">Pool rings (0&ndash;${LIMITS.rings[1]}, usually ${DEFAULTS.rings})</label><input type="number" id="cfg-rings" min="${LIMITS.rings[0]}" max="${LIMITS.rings[1]}" step="1" value="${cur.rings}"${dis(can("rings"))}></div>
       <div class="row ${off(can("crabs"))}"><label for="cfg-crabs">Green crabs (0&ndash;${LIMITS.crabs[1]}, usually ${DEFAULTS.crabs})</label><input type="number" id="cfg-crabs" min="${LIMITS.crabs[0]}" max="${LIMITS.crabs[1]}" step="1" value="${cur.crabs}"${dis(can("crabs"))}></div>
+      <div class="row"><label><input type="checkbox" id="cfg-scenery"${cur.scenery ? " checked" : ""}> Scenery <small>grass beyond the deck and a koi pond</small></label></div>
       <div class="row"><label><input type="checkbox" id="cfg-camera"${cur.camera ? " checked" : ""}> Camera <small>its housing on the ROV, the camera window, and the fish coming to look at it</small></label></div>
       ${can("fish") ? "" : '<div class="note">Fish, crabs and rings are set by the Python server (--fish, --crabs, --rings).</div>'}
     </fieldset>
@@ -105,10 +109,12 @@ export function showConfig({ cfg, configurable = {}, live = {} }) {
   /** Read the form into `cur`, and do what a changed "right now" field means. `which` is the id of the field that changed (or null for all). */
   const read = (which = null) => {
     cur.controls = el.querySelector('input[name="cfg-controls"]:checked').value;
+    cur.mission = $("cfg-mission").value;
     cur.fish = $("cfg-fish").checked;
     cur.rings = clampInt($("cfg-rings").value, LIMITS.rings, DEFAULTS.rings);
     cur.crabs = clampInt($("cfg-crabs").value, LIMITS.crabs, DEFAULTS.crabs);
     cur.camera = $("cfg-camera").checked;
+    cur.scenery = $("cfg-scenery").checked;
     const was = { ...cur };
     cur.current = $("cfg-current").checked;
     cur.flow = $("cfg-flow").value;
@@ -131,7 +137,7 @@ export function showConfig({ cfg, configurable = {}, live = {} }) {
   $("cfg-defaults").addEventListener("click", () => {                          // back to the normal setup: the "right now" ones are applied at once
     Object.assign(cur, DEFAULTS);
     el.querySelectorAll('input[name="cfg-controls"]').forEach((r) => { r.checked = r.value === cur.controls; });
-    $("cfg-fish").checked = cur.fish; $("cfg-rings").value = cur.rings; $("cfg-crabs").value = cur.crabs; $("cfg-camera").checked = cur.camera;
+    $("cfg-mission").value = cur.mission; $("cfg-fish").checked = cur.fish; $("cfg-rings").value = cur.rings; $("cfg-crabs").value = cur.crabs; $("cfg-camera").checked = cur.camera; $("cfg-scenery").checked = cur.scenery;
     $("cfg-current").checked = cur.current; $("cfg-flow").value = cur.flow; $("cfg-speed").value = cur.speed; $("cfg-thrusters").value = cur.thrusters; $("cfg-pool").value = `${cur.poollength}x${cur.poolwidth}`; $("cfg-depth").value = cur.pooldepth; $("cfg-buoy").value = "neutral";
     for (const id of ["cfg-current", "cfg-flow", "cfg-speed", "cfg-thrusters", "cfg-pool", "cfg-depth", "cfg-buoy"]) read(id);
   });
@@ -149,6 +155,16 @@ export function showConfig({ cfg, configurable = {}, live = {} }) {
     setTimeout(() => { $("cfg-copy").textContent = "Copy link"; }, 1500);
   });
   window.addEventListener("keydown", (e) => { if (e.code === "Escape" && document.getElementById("configui")) close(); });
+  import("./music.js").then(async (m) => {                                      // music is this browser's own setting: not in the link, not a restart option
+    const st = m.musicState(), has = await m.musicAvailable();
+    $("cfg-music").checked = st.on && has; $("cfg-musicvol").value = st.volume;
+    const note = () => { $("cfg-musicnote").textContent = has ? "" : "(add web/music/background.mp3, or choose a file)"; };
+    note();
+    $("cfg-music").addEventListener("change", async (e) => { e.stopPropagation(); if (!(await m.setMusicOn($("cfg-music").checked)) && $("cfg-music").checked && !(await m.musicAvailable())) { $("cfg-music").checked = false; $("cfg-musicnote").textContent = "(no music file yet: choose one)"; } });
+    $("cfg-musicvol").addEventListener("input", (e) => { e.stopPropagation(); m.setMusicVolume($("cfg-musicvol").value); });
+    $("cfg-musicpick").addEventListener("click", () => $("cfg-musicfile").click());
+    $("cfg-musicfile").addEventListener("change", async (e) => { e.stopPropagation(); const f = $("cfg-musicfile").files[0]; if (!f) return; await m.useMusicFile(f); $("cfg-music").checked = await m.setMusicOn(true); $("cfg-musicnote").textContent = `(${f.name})`; });
+  }).catch(() => { /* no music module */ });
   refresh();
   $("cfg-close").focus();
 }

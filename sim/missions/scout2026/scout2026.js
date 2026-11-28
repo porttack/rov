@@ -109,7 +109,7 @@ export class Mission {
 
   state(rov) {
     return {
-      type: this.type, id: this.id, locked: this.locked, clock: this.clock.data(), board: this.board.data(), inventory: this.inventory(),
+      type: this.type, id: this.id, title: "Scout 2026", locked: this.locked, clock: this.clock.data(), board: this.board.data(), inventory: this.inventory(),
       carrying: this.rov.mission_carry ? this.rov.mission_carry.id : null, atStairs: atStairs(this.rov), msg: this.msg, deck: deckRect(),
     };
   }

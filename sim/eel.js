@@ -4,6 +4,8 @@
 // Sim coordinates (x ahead, y left, depth down) -> three.js (x, -depth, -y).
 // =============================================================================
 const SMOKE_MAX = 70;
+let sfx = null;                      // sound effects (sfx.js): optional, loaded once
+import("./sfx.js").then((m) => { sfx = m; }).catch(() => { /* no sound */ });
 
 export class Eels {
   constructor(scene, THREE) {
@@ -107,6 +109,7 @@ export class Eels {
     const zap = e.zap > 0;
     this._sparks(zap, dt, e, centre, rov3);
     this._arcs(zap, t, e, centre);
+    if (sfx) sfx.zap(zap);
     this.light.position.copy(centre);
     this.light.intensity = zap ? (Math.random() < 0.6 ? 2 + 6 * Math.random() : 0.2) : 0;
 
